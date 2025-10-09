@@ -1,6 +1,7 @@
 # Linclon Leaderboard Bot
 
 A Discord wellness leaderboard bot that tracks wellness logs, awards XP, and shows leaderboards for competing amongst the server.
+TODO: Rebrand Linclon to Lifted?
 
 ## Project Structure
 
