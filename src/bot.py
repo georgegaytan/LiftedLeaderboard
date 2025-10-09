@@ -13,7 +13,7 @@ def get_intents() -> discord.Intents:
     return intents
 
 
-class LincolnLeaderboardBot(commands.Bot):
+class LinclonLeaderboardBot(commands.Bot):
     def __init__(self) -> None:
         super().__init__(command_prefix=commands.when_mentioned_or("/"), intents=get_intents())
 
@@ -35,7 +35,7 @@ async def main() -> None:
     if not token:
         raise RuntimeError("DISCORD_TOKEN not set in environment or .env")
 
-    bot = LincolnLeaderboardBot()
+    bot = LinclonLeaderboardBot()
     try:
         async with bot:
             await bot.start(token)
