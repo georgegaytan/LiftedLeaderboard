@@ -3,6 +3,7 @@ import asyncio
 from dotenv import load_dotenv
 import discord
 from discord.ext import commands
+import pathlib
 
 
 def get_intents() -> discord.Intents:
@@ -17,18 +18,15 @@ class LincolnLeaderboardBot(commands.Bot):
         super().__init__(command_prefix=commands.when_mentioned_or("/"), intents=get_intents())
 
     async def setup_hook(self) -> None:
-        # Load cogs if present
-        for cog in [
-            "src.cogs.logging_cog",
-            "src.cogs.leaderboard_cog",
-            "src.cogs.events_cog",
-            "src.cogs.admin_cog",
-        ]:
+        cogs_path = pathlib.Path(__file__).parent / "cogs"
+        for file in cogs_path.glob("*_cog.py"):
+            # Convert file name to module path
+            module = f"src.cogs.{file.stem}"
+
             try:
-                await self.load_extension(cog)
-            except Exception:
-                # Cogs are optional at scaffold time
-                pass
+                await self.load_extension(module)
+            except Exception as e:
+                print(f"Failed to load {module}: {e}")
 
 
 async def main() -> None:
@@ -38,8 +36,11 @@ async def main() -> None:
         raise RuntimeError("DISCORD_TOKEN not set in environment or .env")
 
     bot = LincolnLeaderboardBot()
-    async with bot:
-        await bot.start(token)
+    try:
+        async with bot:
+            await bot.start(token)
+    except Exception as e:
+        print(f"Bot failed due to: {e}")
 
 
 if __name__ == "__main__":
