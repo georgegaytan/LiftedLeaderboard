@@ -4,10 +4,19 @@ Discord wellness leaderboard bot. Tracks daily wellness logs, awards XP with boo
 
 ### Quickstart
 - **Python**: 3.11+
-- **Install**:
+- **Install (Windows PowerShell)**:
+  ```powershell
+  python -m venv .venv
+  .\.venv\Scripts\Activate.ps1
+  pip install -U pip
+  pip install -r requirements.txt
+  ```
+- **Install (macOS/Linux)**:
   ```bash
-  python -m venv .venv && .venv\\Scripts\\pip install -U pip
-  .venv\\Scripts\\pip install -r requirements.txt
+  python3 -m venv .venv
+  source .venv/bin/activate
+  pip install -U pip
+  pip install -r requirements.txt
   ```
 - **Config**: create a `.env` with at least:
   ```
@@ -15,7 +24,7 @@ Discord wellness leaderboard bot. Tracks daily wellness logs, awards XP with boo
   GUILD_ID=1234567890
   WEATHER_API_KEY=optional
   ```
-- **Run**:
+- **Run (Windows/macOS/Linux)**:
   ```bash
   python -m src.bot
   ```
