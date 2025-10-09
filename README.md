@@ -2,11 +2,39 @@
 
 A Discord wellness leaderboard bot that tracks wellness logs, awards XP, and shows leaderboards for competing amongst the server.
 
+## Project Structure
+
+```
+LinclonLeaderboard/
+├── src/
+│   ├── bot.py                 # Main script
+│   ├── cogs/                  # Discord command modules
+│   │   ├── *_cog.py           # ...
+│   ├── models/                # Data models
+│   │   ├── *.py               # ...
+│   ├── services/              
+│   │   ├── db_manager.py      # DB management
+│   │   ├── xp_manager.py      # XP management
+│   │   └── scheduler.py       # Scheduled tasks
+│   └── utils/                 
+│       ├── constants.py       
+│       ├── embeds.py          # Embeds formatted for Discord
+│       └── views.py           # Views for User notifications/input
+├── data/                      # DB File is stored here
+├── tests/                     
+├── main.py                    # Alternative entry point
+├── requirements.txt           # Python dependencies
+└── README.md                  # This file
+```
+
+## Commands
+TODO: Command docs
+
 ## Requirements
 
 - **Python**: 3.11+
 
-## Quickstart
+## Setup
 
 ### 1️⃣ Install Dependencies
 
@@ -38,7 +66,8 @@ WEATHER_API_KEY=optional
 
 ### 3️⃣ Initialize the Database
 
-The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file. That file is stored at `data/wellness.db`.
+The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file. 
+That file is stored at `data/wellness.db`.
 
 Before running the bot for the first time, create the database and tables:
 
@@ -63,43 +92,12 @@ This will create `data/wellness.db`.
 python -m src.bot
 ```
 
-## Project Structure
+## Tests
 
-```
-LinclonLeaderboard/
-├── src/
-│   ├── bot.py                 # Main script
-│   ├── cogs/                  # Discord command modules
-│   │   ├── *_cog.py           # ...
-│   ├── models/                # Data models
-│   │   ├── *.py               # ...
-│   ├── services/              
-│   │   ├── db_manager.py      # DB management
-│   │   ├── xp_manager.py      # XP management
-│   │   └── scheduler.py       # Scheduled tasks
-│   └── utils/                 
-│       ├── constants.py       
-│       └── embeds.py          # Embeds formatted for Discord
-├── data/                      # DB File is stored here
-├── tests/                     
-├── main.py                    # Alternative entry point
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
-```
-
-## Commands
-TODO: Command docs
-
-## Development
-
-### Running Tests
 ```bash
 python -m pytest tests/
 ```
 
-### Database Management
-The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates on a single DB file. That file is stored in the `data/` directory. 
-
 ## License
 
-See [LICENSE](LICENSE) for details.
+[LICENSE](LICENSE)
