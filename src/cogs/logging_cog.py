@@ -7,11 +7,8 @@ class LoggingCog(commands.Cog):
 
     @commands.hybrid_command(name="log")
     async def log(self, ctx: commands.Context) -> None:
-        """Placeholder wellness log command."""
         await ctx.reply("Logged! (+XP)")
 
 
 async def setup(bot: commands.Bot) -> None:
     await bot.add_cog(LoggingCog(bot))
-
-
