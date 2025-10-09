@@ -8,7 +8,7 @@ class XpAward:
     xp: int
     reason: str
 
-
+# TODO: Review XP management philosophy and make this scalable
 def award_log_xp(user_id: str, display_name: str, multiplier: float = 1.0) -> XpAward:
     xp = max(1, int(BASE_XP_PER_LOG * multiplier))
     db_manager.execute(

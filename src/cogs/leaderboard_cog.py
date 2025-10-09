@@ -1,5 +1,5 @@
 from discord.ext import commands
-from ..utils.embeds import leaderboard_embed
+from src.utils.embeds import leaderboard_embed
 
 
 class LeaderboardCog(commands.Cog):
@@ -8,7 +8,7 @@ class LeaderboardCog(commands.Cog):
 
     @commands.hybrid_command(name="leaderboard")
     async def leaderboard(self, ctx: commands.Context) -> None:
-        # Hardcoded test user data
+        # TODO: Swap hardcoded for real data plug
         test_user = ("TestUser123", 1500)
         entries = [test_user]
 

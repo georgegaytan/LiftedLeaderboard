@@ -1,6 +1,6 @@
 from src.services import db_manager
 
-
+# TODO: Review test usefulness and add more
 def test_db_bootstrap(tmp_path, monkeypatch):
     tmp_db = tmp_path / "wellness.db"
     monkeypatch.setenv("_DB_OVERRIDE", str(tmp_db))

@@ -2,6 +2,7 @@ from src.services import db_manager
 from src.services.xp_manager import award_log_xp, top_users
 
 
+# TODO: Review test usefulness and add more
 def test_award_and_top(tmp_path, monkeypatch):
     # Route DB to temp
     tmp_db = tmp_path / "wellness.db"

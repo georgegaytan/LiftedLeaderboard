@@ -5,7 +5,8 @@ from typing import Iterable, Optional
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "wellness.db")
 
-
+# TODO: Review Schema, potentially update for scalability
+# TODO: Can we optimize how we call ensure_db() on every function?
 def ensure_db() -> None:
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
