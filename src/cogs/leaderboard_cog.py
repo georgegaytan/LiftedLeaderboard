@@ -1,4 +1,5 @@
 from discord.ext import commands
+from ..utils.embeds import leaderboard_embed
 
 
 class LeaderboardCog(commands.Cog):
@@ -7,7 +8,12 @@ class LeaderboardCog(commands.Cog):
 
     @commands.hybrid_command(name="leaderboard")
     async def leaderboard(self, ctx: commands.Context) -> None:
-        await ctx.reply("Leaderboard placeholder")
+        # Hardcoded test user data
+        test_user = ("TestUser123", 1500)
+        entries = [test_user]
+
+        embed = leaderboard_embed(entries)
+        await ctx.reply(embed=embed)
 
 
 async def setup(bot: commands.Bot) -> None:
