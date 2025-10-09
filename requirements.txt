@@ -1,0 +1,6 @@
+discord.py>=2.3
+APScheduler>=3.10
+python-dotenv>=1.0
+requests>=2.32
+pytest>=8.0
+
