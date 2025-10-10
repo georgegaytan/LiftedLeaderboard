@@ -7,6 +7,7 @@ logger = logging.getLogger(__name__)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "wellness.db")
 
+# TODO: Move DB file into Google Drive or some cloud, on machine splits the data
 def ensure_db():
     """Initialize the database schema if it doesn't already exist."""
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
@@ -89,6 +90,7 @@ def execute(query: str, params: Iterable | None = None) -> None:
         raise
 
 
+# TODO: Setup fetches to convert responses into Dataclasses/Classes from models
 def fetchall(query: str, params: Iterable | None = None) -> list[sqlite3.Row]:
     """Fetch all rows from a SELECT query."""
     with get_connection() as conn:
