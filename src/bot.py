@@ -14,10 +14,10 @@ def get_intents() -> discord.Intents:
 
 
 class LiftedLeaderboardBot(commands.Bot):
-    def __init__(self) -> None:
+    def __init__(self):
         super().__init__(command_prefix=commands.when_mentioned_or("/"), intents=get_intents())
 
-    async def setup_hook(self) -> None:
+    async def setup_hook(self):
         cogs_path = pathlib.Path(__file__).parent / "cogs"
         for file in cogs_path.glob("*_cog.py"):
             # Convert file name to module path
@@ -29,7 +29,7 @@ class LiftedLeaderboardBot(commands.Bot):
                 print(f"Failed to load {module}: {e}")
 
 
-async def main() -> None:
+async def main():
     load_dotenv()
     token = os.getenv("DISCORD_TOKEN")
     if not token:

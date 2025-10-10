@@ -5,9 +5,9 @@ from typing import Iterable, Optional
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(__file__)), "data", "wellness.db")
 
-# TODO: Review Schema, potentially update for scalability
+# TODO: Review Schema, potentially update for scalability? Also add created_at TIMESTAMP
 # TODO: Can we optimize how we call ensure_db() on every function?
-def ensure_db() -> None:
+def ensure_db():
     os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.cursor()
@@ -36,7 +36,7 @@ def ensure_db() -> None:
         conn.commit()
 
 
-def execute(query: str, params: Iterable | None = None) -> None:
+def execute(query: str, params: Iterable | None = None):
     ensure_db()
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(query, tuple(params or ()))
