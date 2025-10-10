@@ -20,13 +20,20 @@ class LiftedLeaderboardBot(commands.Bot):
     async def setup_hook(self):
         cogs_path = pathlib.Path(__file__).parent / "cogs"
         for file in cogs_path.glob("*_cog.py"):
-            # Convert file name to module path
             module = f"src.cogs.{file.stem}"
-
             try:
                 await self.load_extension(module)
+                print(f"Loaded {module}")
             except Exception as e:
                 print(f"Failed to load {module}: {e}")
+
+    async def on_ready(self):
+        guild_id = os.getenv("GUILD_ID")
+        if not guild_id:
+            raise RuntimeError("GUILD_ID not set in environment or .env")
+
+        # Copy global commands to this guild for instant availability
+        self.tree.copy_global_to(guild=discord.Object(id=int(guild_id)))
 
 
 async def main():
