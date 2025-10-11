@@ -38,6 +38,8 @@ def create_schema():
             )
         """)
 
+        # TODO POC: allow users to edit previous activity records via UI?
+        #   Think of effects i.e. XP distribution or achievements... maybe add edits later
         # --- ACTIVITY RECORDS TABLE ---
         cur.execute("""
             CREATE TABLE IF NOT EXISTS activity_records (

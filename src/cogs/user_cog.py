@@ -5,6 +5,7 @@ from datetime import datetime, UTC
 from src.utils.constants import TIMESTAMP_FORMAT
 from src.services import db_manager
 
+# TODO POC: Store activity record history, allow users to view recent activity so they can edit and view progress
 class UserCog(commands.Cog):
     """Cog for handling user registration and profile management."""
 
