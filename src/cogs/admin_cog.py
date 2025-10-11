@@ -2,7 +2,7 @@ from discord.ext import commands
 from src.utils.views import ResetConfirmView
 from src.services import db_manager
 
-# TODO POC: Add Command here or elsewhere to add a User, associated with calling Disc user
+# TODO POC: Add Admin commands to allow add/edit/archive of Activities
 class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot

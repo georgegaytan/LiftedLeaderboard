@@ -26,6 +26,7 @@ def create_schema():
             )
         """)
 
+        # TODO POC: Add Archive flag, and implement behavior throughout code to react to archive state
         # --- ACTIVITIES TABLE ---
         cur.execute("""
             CREATE TABLE IF NOT EXISTS activities (
