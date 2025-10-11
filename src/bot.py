@@ -12,10 +12,10 @@ def get_intents() -> discord.Intents:
     intents.members = True
     return intents
 
-
+# TODO: Setup logging storage system
 class LiftedLeaderboardBot(commands.Bot):
     def __init__(self):
-        super().__init__(command_prefix=commands.when_mentioned_or("/"), intents=get_intents())
+        super().__init__(command_prefix="/",intents=get_intents())
 
     async def setup_hook(self):
         cogs_path = pathlib.Path(__file__).parent / "cogs"

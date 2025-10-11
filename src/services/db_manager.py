@@ -28,23 +28,25 @@ def ensure_db():
         """)
 
         # --- ACTIVITIES TABLE ---
-        # Now includes XP value per activity
         cur.execute("""
             CREATE TABLE IF NOT EXISTS activities (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT UNIQUE NOT NULL,
+                category TEXT NOT NULL,
                 xp_value INTEGER NOT NULL DEFAULT 0,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """)
 
-        # --- LOGS TABLE ---
-        # Logs link user -> activity; XP derived from activity.xp_value
+        # --- ACTIVITY RECORDS TABLE ---
         cur.execute("""
-            CREATE TABLE IF NOT EXISTS logs (
+            CREATE TABLE IF NOT EXISTS activity_records (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
                 activity_id INTEGER NOT NULL,
+                note TEXT DEFAULT NULL,
+                date_occurred DATE DEFAULT CURRENT_DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
                 FOREIGN KEY (activity_id) REFERENCES activities(id)
@@ -52,24 +54,44 @@ def ensure_db():
         """)
 
         # --- INDEXES ---
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_logs_user_id ON logs(user_id);")
-        cur.execute("CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_activity_records_user_id ON activity_records(user_id);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_activity_records_activity_id ON activity_records(activity_id);")
+        cur.execute("CREATE INDEX IF NOT EXISTS idx_activity_records_created_at ON activity_records(created_at);")
 
         # --- TRIGGER: Automatically award XP based on activity.xp_value ---
         cur.execute("""
             CREATE TRIGGER IF NOT EXISTS award_activity_xp
-            AFTER INSERT ON logs
+            AFTER INSERT ON activity_records
             BEGIN
                 UPDATE users
-                SET total_xp = total_xp + (
-                    SELECT xp_value FROM activities WHERE id = NEW.activity_id
+                SET total_xp = total_xp + COALESCE(
+                    (SELECT xp_value FROM activities WHERE id = NEW.activity_id), 0
                 ),
                 updated_at = CURRENT_TIMESTAMP
                 WHERE user_id = NEW.user_id;
             END;
         """)
 
+        # --- TRIGGER: Automatically update updated_at on user changes ---
+        cur.execute("""
+            CREATE TRIGGER IF NOT EXISTS update_user_timestamp
+            AFTER UPDATE ON users
+            BEGIN
+                UPDATE users SET updated_at = CURRENT_TIMESTAMP WHERE user_id = NEW.user_id;
+            END;
+        """)
+
+        # --- TRIGGER: Automatically update updated_at on activity changes ---
+        cur.execute("""
+            CREATE TRIGGER IF NOT EXISTS update_activity_timestamp
+            AFTER UPDATE ON activities
+            BEGIN
+                UPDATE activities SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+            END;
+        """)
+
         conn.commit()
+
 
 def get_connection() -> sqlite3.Connection:
     """Create a connection with foreign key enforcement and dict row access."""
