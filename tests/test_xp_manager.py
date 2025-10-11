@@ -11,7 +11,8 @@ def test_award_and_top(tmp_path, monkeypatch):
     # ensure_db uses module path; simple isolation by removing file if exists
     if tmp_db.exists():
         tmp_db.unlink()
-    db_manager.ensure_db()
+    from src.database.schema import create_schema
+    create_schema()
 
     res = award_log_xp("1", "Alice")
     assert res.xp > 0

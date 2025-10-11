@@ -12,8 +12,13 @@ LiftedLeaderboard/
 │   │   ├── *_cog.py           # ...
 │   ├── models/                # Data models
 │   │   ├── *.py               # ...
+│   ├── database/              # Database setup & migrations
+│   │   ├── schema.py          # Database schema creation
+│   │   ├── setup.py           # Database initialization script
+│   │   └── migrations/        # Future database migrations
+│   │       └── README.md      # Migration guidelines
 │   ├── services/              
-│   │   ├── db_manager.py      # DB management
+│   │   ├── db_manager.py      # Runtime DB operations
 │   │   ├── xp_manager.py      # XP management
 │   │   └── scheduler.py       # Scheduled tasks
 │   └── utils/                 
@@ -72,7 +77,7 @@ That file is stored at `data/wellness.db`.
 Before running the bot for the first time, create the database and tables:
 
 ```powershell
-python src/init_db.py
+python src/database/setup.py
 ```
 
 You should see output confirming the tables exist:

@@ -1,7 +1,8 @@
-from services import db_manager
+from src.database.schema import create_schema
+from src.services import db_manager
 
 # Step 1: Create database and tables
-db_manager.ensure_db()
+create_schema()
 print("Database and tables created/verified.")
 
 # Step 2: Optional: Verify tables exist
