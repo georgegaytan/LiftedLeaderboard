@@ -19,7 +19,6 @@ LiftedLeaderboard/
 │   │       └── README.md      # Migration guidelines
 │   ├── services/              
 │   │   ├── db_manager.py      # Runtime DB operations
-│   │   ├── xp_manager.py      # XP management
 │   │   └── scheduler.py       # Scheduled tasks
 │   └── utils/                 
 │       ├── constants.py       
