@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-#TODO: Plug into DB
+#TODO POC: Plug into DB
 class LoggingCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot

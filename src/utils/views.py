@@ -27,7 +27,7 @@ class BaseConfirmView(discord.ui.View):
         self.value = False
         self.stop()
 
-# TODO: Create /utils/views dir when more Views are added
+# TODO POC: Create /utils/views dir when more Views are added
 class ResetConfirmView(BaseConfirmView):
     """Specialized confirmation for leaderboard resets"""
 

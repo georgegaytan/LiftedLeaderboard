@@ -26,7 +26,7 @@ def execute(query: str, params: Iterable | None = None) -> None:
         raise
 
 
-# TODO: Setup fetches to convert responses into Dataclasses/Classes from models
+# TODO POC: Setup fetches to convert responses into Dataclasses/Classes from models
 def fetchall(query: str, params: Iterable | None = None) -> list[sqlite3.Row]:
     """Fetch all rows from a SELECT query."""
     with get_connection() as conn:

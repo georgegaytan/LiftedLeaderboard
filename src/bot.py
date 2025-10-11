@@ -12,7 +12,7 @@ def get_intents() -> discord.Intents:
     intents.members = True
     return intents
 
-# TODO: Setup logging storage system
+# TODO POC: Setup logging error storage system
 class LiftedLeaderboardBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix="/",intents=get_intents())

@@ -8,7 +8,7 @@ class LeaderboardCog(commands.Cog):
 
     @commands.hybrid_command(name="leaderboard")
     async def leaderboard(self, ctx: commands.Context):
-        # TODO: Swap hardcoded for real data plug
+        # TODO POC: Swap hardcoded for real data plug
         test_user = ("TestUser123", 1500)
         entries = [test_user]
 
