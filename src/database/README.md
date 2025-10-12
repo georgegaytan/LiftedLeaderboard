@@ -41,14 +41,8 @@ It will prompt for a short note and generate a new timestamped Python file in th
 
 ## Running Migrations
 
-Migrations are run automatically by `src/database/setup_db.py`:
+Migrations are run in `src/database/start_db.py` when you boot up the bot or run the script manually.
 
-```python
-from src.database import setup
-
-setup.run()  # Creates schema and applies all migrations in /migrations
-```
-
-- This will create the database schema (if it doesn’t exist) and run all migrations in timestamp order.
+This will create the database schema (if it doesn’t exist) and run all unapplied migrations in timestamp order.
 
 ### TODO POC: Track Migrations in a table to avoid rerunning applied migrations for idempotency
