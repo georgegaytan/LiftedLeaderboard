@@ -58,7 +58,23 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-### 2️⃣ Configure Environment
+### 2️⃣ Install Pre-Commit Hooks (Recommended)
+
+This project uses pre-commit to automatically check code style, linting, and formatting before commits.
+
+To enable it:
+```bash
+pip install pre-commit
+pre-commit install
+```
+This installs the git hooks defined in .pre-commit-config.yaml.
+You can manually run the checks on all files at any time with:
+```bash
+pre-commit run --all-files
+```
+
+
+### 3️⃣ Configure Environment
 
 Create a `.env` file in the root of the project:
 
@@ -68,7 +84,7 @@ GUILD_ID=1234567890
 WEATHER_API_KEY=optional
 ```
 
-### 3️⃣ Initialize the Database
+### 4️⃣ Initialize the Database
 
 The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file.
 That file is stored at `data/wellness.db`.
@@ -90,7 +106,7 @@ This will create `data/wellness.db`.
 
 
 
-### 4️⃣ Run the Bot
+### 5️⃣ Run the Bot
 
 ```bash
 python -m src.bot
