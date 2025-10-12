@@ -45,4 +45,4 @@ Migrations are run in `src/database/start_db.py` when you boot up the bot or run
 
 This will create the database schema (if it doesn’t exist) and run all unapplied migrations in timestamp order.
 
-### TODO POC: Track Migrations in a table to avoid rerunning applied migrations for idempotency
+Applied migrations are tracked in the `migrations` table.
