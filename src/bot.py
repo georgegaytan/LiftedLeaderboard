@@ -34,8 +34,11 @@ class LiftedLeaderboardBot(commands.Bot):
         if not guild_id:
             raise RuntimeError('GUILD_ID not set in environment or .env')
 
-        # Copy global commands to this guild for instant availability
-        self.tree.copy_global_to(guild=discord.Object(id=int(guild_id)))
+        guild = discord.Object(id=int(guild_id))
+
+        # Copy global commands to the guild (for instant availability)
+        self.tree.copy_global_to(guild=guild)
+        await self.tree.sync(guild=guild)
 
 
 async def main():

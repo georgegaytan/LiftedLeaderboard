@@ -79,9 +79,9 @@ class ActivityCog(commands.Cog):
         # --- Ensure user exists ---
         execute(
             '''
-            INSERT INTO users (user_id, display_name)
+            INSERT INTO users (id, display_name)
             VALUES (?, ?)
-            ON CONFLICT(user_id) DO UPDATE SET display_name=excluded.display_name
+            ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name
             ''',
             (user_id, display_name),
         )
