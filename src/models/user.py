@@ -7,5 +7,3 @@ class User:
     display_name: str
     total_xp: int = 0
     level: int = 1
-
-

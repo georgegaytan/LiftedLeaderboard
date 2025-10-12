@@ -9,5 +9,3 @@ class Log:
     activity: str
     xp_awarded: int
     created_at: datetime | None = None
-
-

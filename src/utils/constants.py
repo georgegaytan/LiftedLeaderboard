@@ -1,4 +1,3 @@
-TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S' # For SQLite TIMESTAMP
+TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'  # For SQLite TIMESTAMP
 
 BASE_XP_PER_LOG: int = 10
-

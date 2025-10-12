@@ -17,15 +17,15 @@ LiftedLeaderboard/
 │   │   ├── setup.py           # Database initialization script
 │   │   └── migrations/        # Future database migrations
 │   │       └── README.md      # Migration guidelines
-│   ├── services/              
+│   ├── services/
 │   │   ├── db_manager.py      # Runtime DB operations
 │   │   └── scheduler.py       # Scheduled tasks
-│   └── utils/                 
-│       ├── constants.py       
+│   └── utils/
+│       ├── constants.py
 │       ├── embeds.py          # Embeds formatted for Discord
 │       └── views.py           # Views for User notifications/input
 ├── data/                      # DB File is stored here
-├── tests/                     
+├── tests/
 ├── main.py                    # Alternative entry point
 ├── requirements.txt           # Python dependencies
 └── README.md                  # This file
@@ -70,7 +70,7 @@ WEATHER_API_KEY=optional
 
 ### 3️⃣ Initialize the Database
 
-The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file. 
+The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file.
 That file is stored at `data/wellness.db`.
 
 Before running the bot for the first time, create the database and tables:
