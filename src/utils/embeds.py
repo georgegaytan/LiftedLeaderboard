@@ -1,4 +1,8 @@
+import random
+
 import discord
+
+from src.utils.constants import HEALTH_FACTS
 
 
 def leaderboard_embed(entries: list[tuple[str, int, int]]) -> discord.Embed:
@@ -21,5 +25,5 @@ def leaderboard_embed(entries: list[tuple[str, int, int]]) -> discord.Embed:
             inline=False,
         )
 
-    embed.set_footer(text='Do some mf activities lil bros')
+    embed.set_footer(text=random.choice(HEALTH_FACTS))
     return embed
