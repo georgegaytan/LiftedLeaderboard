@@ -31,6 +31,8 @@ def create_schema():
         '''
         )
 
+        # TODO POC: Add Archive flag,
+        #  and implement behavior throughout code to react to archive state
         # --- ACTIVITIES TABLE ---
         cur.execute(
             '''
@@ -45,6 +47,8 @@ def create_schema():
         '''
         )
 
+        # TODO: allow users to edit previous activity records via UI?
+        #   Side effects i.e. XP distribution or achievements... add edits later
         # --- ACTIVITY RECORDS TABLE ---
         cur.execute(
             '''
