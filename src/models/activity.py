@@ -3,10 +3,11 @@ from datetime import datetime, timezone
 
 
 @dataclass
-class User:
-    display_name: str
-    total_xp: int = 0
-    level: int = 1
+class Activity:
+    name: str
+    category: str
+    xp_value: int = 0
+    is_archived: bool = False
     created_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
     updated_at: datetime = field(default_factory=lambda: datetime.now(timezone.utc))
-    id: int = field(init=False)  # Auto-assigned by DB
+    id: int = field(init=False)  # assigned after DB insert

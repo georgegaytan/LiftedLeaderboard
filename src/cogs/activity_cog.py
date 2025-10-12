@@ -18,7 +18,7 @@ class ActivityCog(commands.Cog):
             '''
             SELECT DISTINCT category
             FROM activities
-            WHERE category LIKE ?
+            WHERE category LIKE ? AND is_archived = 0
             ORDER BY category ASC
             LIMIT 25
             ''',
@@ -41,7 +41,7 @@ class ActivityCog(commands.Cog):
             '''
             SELECT name
             FROM activities
-            WHERE category = ? AND name LIKE ?
+            WHERE category = ? AND name LIKE ? AND is_archived = 0
             ORDER BY name ASC
             LIMIT 25
             ''',

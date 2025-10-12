@@ -5,7 +5,7 @@ from src.utils.views import ResetConfirmView
 
 
 # TODO POC: Add Admin commands to allow add/edit/archive of Activities
-# TODO POC: Add Command here or elsewhere to add a User,
+# TODO POC: Add Command here or elsewhere to add a User
 # associated with calling Discord user
 class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):

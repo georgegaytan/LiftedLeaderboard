@@ -21,18 +21,16 @@ def create_schema():
         cur.execute(
             '''
             CREATE TABLE IF NOT EXISTS users (
-                user_id INTEGER PRIMARY KEY,
+                id INTEGER PRIMARY KEY,
                 display_name TEXT NOT NULL,
                 total_xp INTEGER NOT NULL DEFAULT 0,
                 level INTEGER NOT NULL DEFAULT 1,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        '''
+            '''
         )
 
-        # TODO POC: Add Archive flag,
-        #  and implement behavior throughout code to react to archive state
         # --- ACTIVITIES TABLE ---
         cur.execute(
             '''
@@ -41,14 +39,13 @@ def create_schema():
                 name TEXT UNIQUE NOT NULL,
                 category TEXT NOT NULL,
                 xp_value INTEGER NOT NULL DEFAULT 0,
+                is_archived BOOLEAN NOT NULL DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        '''
+            '''
         )
 
-        # TODO: allow users to edit previous activity records via UI?
-        #   Side effects i.e. XP distribution or achievements... add edits later
         # --- ACTIVITY RECORDS TABLE ---
         cur.execute(
             '''
@@ -59,10 +56,10 @@ def create_schema():
                 note TEXT DEFAULT NULL,
                 date_occurred DATE DEFAULT CURRENT_DATE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (activity_id) REFERENCES activities(id)
             )
-        '''
+            '''
         )
 
         # --- INDEXES ---
@@ -90,9 +87,9 @@ def create_schema():
                     (SELECT xp_value FROM activities WHERE id = NEW.activity_id), 0
                 ),
                 updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = NEW.user_id;
+                WHERE id = NEW.user_id;
             END;
-        '''
+            '''
         )
 
         # --- TRIGGER: Automatically update updated_at on user changes ---
@@ -102,9 +99,9 @@ def create_schema():
             AFTER UPDATE ON users
             BEGIN
                 UPDATE users SET updated_at = CURRENT_TIMESTAMP
-                WHERE user_id = NEW.user_id;
+                WHERE id = NEW.id;
             END;
-        '''
+            '''
         )
 
         # --- TRIGGER: Automatically update updated_at on activity changes ---
@@ -115,7 +112,7 @@ def create_schema():
             BEGIN
                 UPDATE activities SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
             END;
-        '''
+            '''
         )
 
         conn.commit()
