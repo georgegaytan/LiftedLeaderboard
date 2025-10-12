@@ -1,26 +1,29 @@
 import importlib.util
+import logging
 import os
 
 from src.database.init_schema import init_schema
 from src.services.db_manager import DBManager
+
+logger = logging.getLogger(__name__)
 
 
 def run(db: DBManager):
     '''Run full DB setup: schema + migrations.'''
     # Step 1: Create database and tables
     init_schema(db)
-    print('Database and tables created/verified.')
+    logger.info('Database and tables created/verified.')
 
     # Step 2: Optional: Verify tables exist
     tables = db.fetchall('SELECT name FROM sqlite_master WHERE type="table";')
-    print('Current tables in DB:', [t['name'] for t in tables])
+    logger.info(f'Current tables in DB: {[t["name"] for t in tables]}')
 
     # Step 3: Run migrations
     migrations_dir = os.path.join(
         os.path.dirname(os.path.abspath(__file__)), 'migrations'
     )
     if not os.path.exists(migrations_dir):
-        print('No migrations directory found, skipping migrations.')
+        logger.error('No migrations directory found, skipping migrations.')
         return
 
     migration_files = sorted(
@@ -34,7 +37,7 @@ def run(db: DBManager):
     # Run only new migrations
     for filename in migration_files:
         if filename in applied_migrations:
-            print(f'Skipping applied migration: {filename}')
+            logger.debug(f'Skipping applied migration: {filename}')
             continue
 
         filepath = os.path.join(migrations_dir, filename)
@@ -50,17 +53,17 @@ def run(db: DBManager):
             spec.loader.exec_module(migration)
 
             if hasattr(migration, 'up'):
-                print(f'Running migration: {filename}')
+                logger.info(f'Running migration: {filename}')
                 migration.up(db)
                 db.execute('INSERT INTO migrations (filename) VALUES (?)', (filename,))
             else:
-                print(f'⚠️ Skipping {filename}: no `up()` function found.')
+                logger.error(f'⚠️ Skipping {filename}: no `up()` function found.')
 
-        except Exception as e:
-            print(f'❌ Error running migration {filename}: {e}')
+        except Exception:
+            logger.error(f'❌ Error running migration {filename}', exc_info=True)
             raise
 
-    print('Migrations complete.')
+    logger.info('Migrations complete.')
 
 
 if __name__ == '__main__':

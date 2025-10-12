@@ -1,10 +1,18 @@
 import asyncio
+import logging
 import os
 import pathlib
 
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
+
+# --- Logging setup ---
+logging.basicConfig(
+    level=logging.INFO,  # Min level to show: DEBUG<INFO<WARNING<ERROR<CRITICAL
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+)
+logger = logging.getLogger(__name__)
 
 
 def get_intents() -> discord.Intents:
@@ -14,7 +22,6 @@ def get_intents() -> discord.Intents:
     return intents
 
 
-# TODO POC: Setup logging error storage system
 class LiftedLeaderboardBot(commands.Bot):
     def __init__(self):
         super().__init__(command_prefix='/', intents=get_intents())
@@ -25,9 +32,9 @@ class LiftedLeaderboardBot(commands.Bot):
             module = f'src.cogs.{file.stem}'
             try:
                 await self.load_extension(module)
-                print(f'Loaded {module}')
-            except Exception as e:
-                print(f'Failed to load {module}: {e}')
+                logger.info(f'Loaded {module}')
+            except Exception:
+                logger.error(f'Failed to load {module}', exc_info=True)
 
     async def on_ready(self):
         guild_id = os.getenv('GUILD_ID')
@@ -35,10 +42,9 @@ class LiftedLeaderboardBot(commands.Bot):
             raise RuntimeError('GUILD_ID not set in environment or .env')
 
         guild = discord.Object(id=int(guild_id))
-
-        # Copy global commands to the guild (for instant availability)
         self.tree.copy_global_to(guild=guild)
         await self.tree.sync(guild=guild)
+        logger.info(f'Bot ready! Synced commands to guild {guild_id}')
 
 
 async def main():
@@ -51,8 +57,8 @@ async def main():
     try:
         async with bot:
             await bot.start(token)
-    except Exception as e:
-        print(f'Bot failed due to: {e}')
+    except Exception:
+        logger.error('Bot failed due to an exception', exc_info=True)
 
 
 if __name__ == '__main__':

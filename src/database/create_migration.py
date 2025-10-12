@@ -1,5 +1,8 @@
+import logging
 import os
 from datetime import datetime
+
+logger = logging.getLogger(__name__)
 
 MIGRATIONS_DIR = os.path.join('migrations')
 os.makedirs(MIGRATIONS_DIR, exist_ok=True)
@@ -17,7 +20,7 @@ def create_migration(_note: str):
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(f'Migration for "{_note}"')
 
-    print(f'✅ Created new migration file: {filepath}')
+    logger.info(f'✅ Created new migration file: {filepath}')
 
 
 if __name__ == '__main__':
