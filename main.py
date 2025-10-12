@@ -1,10 +1,11 @@
+import asyncio
+
 from src.bot import main as run
-from src.database.schema import create_schema  # import your schema setup
+from src.database import setup as setup_db
 
 if __name__ == '__main__':
-    import asyncio
+    # Run full DB setup (schema + migrations)
+    setup_db.run()
 
-    # Initialize the database schema once before the bot starts
-    create_schema()
-
+    # Start the bot
     asyncio.run(run())

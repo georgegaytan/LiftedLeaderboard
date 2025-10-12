@@ -84,29 +84,11 @@ GUILD_ID=1234567890
 WEATHER_API_KEY=optional
 ```
 
-### 4️⃣ Initialize the Database
+
+### 4️⃣ Run the Bot
 
 The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file.
-That file is stored at `data/wellness.db`.
-
-Before running the bot for the first time, create the database and tables:
-
-```powershell
-python src/database/setup.py
-```
-
-You should see output confirming the tables exist:
-
-```
-Database and tables created/verified.
-Current tables in DB: ['users', 'logs']
-```
-
-This will create `data/wellness.db`.
-
-
-
-### 5️⃣ Run the Bot
+That file is stored at `data/wellness.db`. The DB is initialized on startup.
 
 ```bash
 python -m src.bot

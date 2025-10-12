@@ -3,10 +3,9 @@ from datetime import date
 from discord import Interaction, app_commands
 from discord.ext import commands
 
-from src.services.db_manager import execute, fetchall, fetchone
+from src.services.db_manager import DBManager
 
 
-# TODO POC: Test functionalities after DB is populated
 class ActivityCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -14,20 +13,21 @@ class ActivityCog(commands.Cog):
     # --- Autocomplete for category ---
     async def category_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete available categories from the DB.'''
-        categories = fetchall(
-            '''
-            SELECT DISTINCT category
-            FROM activities
-            WHERE category LIKE ? AND is_archived = 0
-            ORDER BY category ASC
-            LIMIT 25
-            ''',
-            (f'%{current}%',),
-        )
-        return [
-            app_commands.Choice(name=row['category'], value=row['category'])
-            for row in categories
-        ]
+        with DBManager() as db:
+            categories = db.fetchall(
+                '''
+                SELECT DISTINCT category
+                FROM activities
+                WHERE category LIKE ? AND is_archived = 0
+                ORDER BY category ASC
+                LIMIT 25
+                ''',
+                (f'%{current}%',),
+            )
+            return [
+                app_commands.Choice(name=row['category'], value=row['category'])
+                for row in categories
+            ]
 
     # --- Autocomplete for activity based on selected category ---
     async def activity_autocomplete(self, interaction: Interaction, current: str):
@@ -37,20 +37,21 @@ class ActivityCog(commands.Cog):
         if not category:
             return []  # No category selected yet
 
-        activities = fetchall(
-            '''
-            SELECT name
-            FROM activities
-            WHERE category = ? AND name LIKE ? AND is_archived = 0
-            ORDER BY name ASC
-            LIMIT 25
-            ''',
-            (category, f'%{current}%'),
-        )
-        return [
-            app_commands.Choice(name=row['name'], value=row['name'])
-            for row in activities
-        ]
+        with DBManager() as db:
+            activities = db.fetchall(
+                '''
+                SELECT name
+                FROM activities
+                WHERE category = ? AND name LIKE ? AND is_archived = 0
+                ORDER BY name ASC
+                LIMIT 25
+                ''',
+                (category, f'%{current}%'),
+            )
+            return [
+                app_commands.Choice(name=row['name'], value=row['name'])
+                for row in activities
+            ]
 
     # --- Command: /record ---
     @app_commands.command(name='record', description='Record an activity to earn XP')
@@ -76,49 +77,50 @@ class ActivityCog(commands.Cog):
         display_name = interaction.user.display_name
         date_value = date_occurred or date.today().isoformat()
 
-        # --- Ensure user exists ---
-        execute(
-            '''
-            INSERT INTO users (id, display_name)
-            VALUES (?, ?)
-            ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name
-            ''',
-            (user_id, display_name),
-        )
-
-        # --- Lookup activity ---
-        activity_row = fetchone(
-            'SELECT id, xp_value FROM activities WHERE name = ? AND category = ?',
-            (activity, category),
-        )
-
-        if not activity_row:
-            await interaction.response.send_message(
-                f'❌ Activity "{activity}" not found in category "{category}".',
-                ephemeral=True,
+        with DBManager() as db:
+            # --- Ensure user exists ---
+            db.execute(
+                '''
+                INSERT INTO users (id, display_name)
+                VALUES (?, ?)
+                ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name
+                ''',
+                (user_id, display_name),
             )
-            return
 
-        activity_id = activity_row['id']
+            # --- Lookup activity ---
+            activity_row = db.fetchone(
+                'SELECT id, xp_value FROM activities WHERE name = ? AND category = ?',
+                (activity, category),
+            )
 
-        # --- Record the activity ---
-        execute(
-            '''
-            INSERT INTO activity_records (user_id, activity_id, note, date_occurred)
-            VALUES (?, ?, ?, ?)
-            ''',
-            (user_id, activity_id, note, date_value),
-        )
+            if not activity_row:
+                await interaction.response.send_message(
+                    f'❌ Activity "{activity}" not found in category "{category}".',
+                    ephemeral=True,
+                )
+                return
 
-        # XP is handled automatically by trigger
-        message = f"✅ Recorded: **{activity}** (+{activity_row['xp_value']} XP)"
-        message += f'\n📂 Category: {category}'
-        if note:
-            message += f'\n📝 _{note}_'
-        if date_occurred:
-            message += f'\n📅 Date: {date_value}'
+            activity_id = activity_row['id']
 
-        await interaction.response.send_message(message)
+            # --- Record the activity ---
+            db.execute(
+                '''
+                INSERT INTO activity_records (user_id, activity_id, note, date_occurred)
+                VALUES (?, ?, ?, ?)
+                ''',
+                (user_id, activity_id, note, date_value),
+            )
+
+            # XP is handled automatically by trigger
+            message = f"✅ Recorded: **{activity}** (+{activity_row['xp_value']} XP)"
+            message += f'\n📂 Category: {category}'
+            if note:
+                message += f'\n📝 _{note}_'
+            if date_occurred:
+                message += f'\n📅 Date: {date_value}'
+
+            await interaction.response.send_message(message)
 
 
 async def setup(bot: commands.Bot):

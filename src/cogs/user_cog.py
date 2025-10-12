@@ -1,9 +1,10 @@
 import discord
 from discord.ext import commands
 
-from src.services import db_manager
+from src.services.db_manager import DBManager
 
 
+# TODO POC: Levels based on OSRS scaling? Add XP bonus on each level up?
 # TODO POC: Store activity record history,
 #   allow users to view recent activity so they can edit and view progress
 class UserCog(commands.Cog):
@@ -18,21 +19,22 @@ class UserCog(commands.Cog):
         user_id = str(ctx.author.id)
         display_name = ctx.author.display_name
 
-        # Check if the user already exists
-        existing = db_manager.fetchone('SELECT id FROM users WHERE id = ?', (user_id,))
-        if existing:
-            await ctx.send(f'✅ {ctx.author.mention}, you’re already registered!')
-            return
+        with DBManager() as db:
+            # Check if the user already exists
+            existing = db.fetchone('SELECT id FROM users WHERE id = ?', (user_id,))
+            if existing:
+                await ctx.send(f'✅ {ctx.author.mention}, you’re already registered!')
+                return
 
-        # Register the user
-        db_manager.execute(
-            '''
-            INSERT INTO users (id, display_name)
-            VALUES (?, ?)
-            ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name
-            ''',
-            (user_id, display_name),
-        )
+            # Register the user
+            db.execute(
+                '''
+                INSERT INTO users (id, display_name)
+                VALUES (?, ?)
+                ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name
+                ''',
+                (user_id, display_name),
+            )
 
         await ctx.send(f'🎉 {ctx.author.mention}, you’ve been registered successfully!')
 
@@ -42,26 +44,27 @@ class UserCog(commands.Cog):
         target = member or ctx.author
         user_id = str(target.id)
 
-        user = db_manager.fetchone(
-            'SELECT display_name, total_xp, level, updated_at FROM users '
-            'WHERE id = ?',
-            (user_id,),
-        )
+        with DBManager() as db:
+            user = db.fetchone(
+                'SELECT display_name, total_xp, level, updated_at FROM users '
+                'WHERE id = ?',
+                (user_id,),
+            )
 
-        if not user:
-            await ctx.send(f'⚠️ {target.mention} isn’t registered yet.')
-            return
+            if not user:
+                await ctx.send(f'⚠️ {target.mention} isn’t registered yet.')
+                return
 
-        display_name, total_xp, level, updated_at = user
-        embed = discord.Embed(
-            title=f"{display_name}'s Profile",
-            color=discord.Color.blurple(),
-        )
-        embed.add_field(name='Level', value=level)
-        embed.add_field(name='Total XP', value=total_xp)
-        embed.set_footer(text=f'Last Updated: {updated_at}')
+            display_name, total_xp, level, updated_at = user
+            embed = discord.Embed(
+                title=f"{display_name}'s Profile",
+                color=discord.Color.blurple(),
+            )
+            embed.add_field(name='Level', value=level)
+            embed.add_field(name='Total XP', value=total_xp)
+            embed.set_footer(text=f'Last Updated: {updated_at}')
 
-        await ctx.send(embed=embed)
+            await ctx.send(embed=embed)
 
 
 async def setup(bot):

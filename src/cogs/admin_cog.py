@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-from src.services import db_manager
+from src.services.db_manager import DBManager
 from src.utils.views import ResetConfirmView
 
 
@@ -26,7 +26,8 @@ class AdminCog(commands.Cog):
         await view.wait()
 
         if view.value:
-            db_manager.execute('DELETE FROM logs')
+            with DBManager() as db:
+                db.execute('DELETE FROM logs')
             await ctx.send('✅ All XP has been reset!')
         else:
             await ctx.send('❌ XP Reset canceled.')
