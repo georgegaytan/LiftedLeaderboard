@@ -1,5 +1,6 @@
 from discord.ext import commands
 
+from src.services.db_manager import DBManager
 from src.utils.embeds import leaderboard_embed
 
 
@@ -8,13 +9,26 @@ class LeaderboardCog(commands.Cog):
         self.bot = bot
 
     @commands.hybrid_command(name='leaderboard')
-    async def leaderboard(self, ctx: commands.Context):
-        # TODO POC: Swap hardcoded for real data plug
-        test_user = ('TestUser123', 1500)
-        entries = [test_user]
+    async def leaderboard(self, ctx: commands.Context, top: int = 10):
+        '''Show the top users by total XP.'''
+        with DBManager() as db:
+            rows = db.fetchall(
+                '''
+                SELECT display_name, level, total_xp
+                FROM users
+                ORDER BY total_xp DESC
+                LIMIT ?
+                ''',
+                (top,),
+            )
 
-        embed = leaderboard_embed(entries)
-        await ctx.reply(embed=embed)
+        entries = [(row['display_name'], row['level'], row['total_xp']) for row in rows]
+
+        if not entries:
+            await ctx.reply('No users found on the leaderboard yet.')
+            return
+
+        await ctx.reply(embed=leaderboard_embed(entries))
 
 
 async def setup(bot: commands.Bot):
