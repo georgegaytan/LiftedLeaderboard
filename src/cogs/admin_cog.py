@@ -1,3 +1,4 @@
+from discord import app_commands
 from discord.ext import commands
 
 from src.components.admin import ResetConfirmView
@@ -9,7 +10,10 @@ class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name='reset_xp')
+    @app_commands.command(
+        name='reset_xp',
+        description='Admin-only command to reset all xp data (with confirmation).',
+    )
     @commands.has_guild_permissions(administrator=True)
     async def reset_xp(self, ctx: commands.Context):
         '''Admin-only command to reset all xp data (with confirmation).'''

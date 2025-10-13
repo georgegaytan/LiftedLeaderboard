@@ -1,3 +1,4 @@
+from discord import Interaction, app_commands
 from discord.ext import commands
 
 from src.components.leaderboard import leaderboard_embed
@@ -8,9 +9,16 @@ class LeaderboardCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    @commands.hybrid_command(name='leaderboard')
-    async def leaderboard(self, ctx: commands.Context, top: int = 10):
+    @app_commands.command(
+        name='leaderboard', description='Show the top users by total XP.'
+    )
+    @app_commands.describe(
+        top='How many users to show on the leaderboard (default 10, max 50)'
+    )
+    async def leaderboard(self, interaction: Interaction, top: int = 10):
         '''Show the top users by total XP.'''
+        lim = max(3, min(50, top))  # enforce reasonable limits
+
         with DBManager() as db:
             rows = db.fetchall(
                 '''
@@ -19,16 +27,19 @@ class LeaderboardCog(commands.Cog):
                 ORDER BY total_xp DESC
                 LIMIT ?
                 ''',
-                (top,),
+                (lim,),
             )
 
         entries = [(row['display_name'], row['level'], row['total_xp']) for row in rows]
 
         if not entries:
-            await ctx.reply('No users found on the leaderboard yet.')
+            await interaction.response.send_message(
+                'No users found on the leaderboard yet.', ephemeral=True
+            )
             return
 
-        await ctx.reply(embed=leaderboard_embed(entries))
+        embed = leaderboard_embed(entries)
+        await interaction.response.send_message(embed=embed)
 
 
 async def setup(bot: commands.Bot):
