@@ -6,6 +6,7 @@ from src.database import start_db
 from src.services.db_manager import DBManager
 from src.utils.logs import setup_logging
 
+# TODO: Go over Code again and clean up long files, DRY things, and make helpers
 # TODO POC: Setup git releases, issues/branches for features,
 #  and deploy the latest main on Prod Bot on a service
 if __name__ == '__main__':
