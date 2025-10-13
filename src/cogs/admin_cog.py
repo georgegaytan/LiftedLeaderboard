@@ -1,6 +1,6 @@
 from discord.ext import commands
 
-from src.components import ResetConfirmView
+from src.components.admin import ResetConfirmView
 from src.services.db_manager import DBManager
 
 
