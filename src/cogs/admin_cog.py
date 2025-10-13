@@ -6,6 +6,7 @@ from src.services.db_manager import DBManager
 
 
 # TODO POC: Add Admin commands to allow add/edit/archive of Activities
+#   Remember to ensure Triggers update historic XP awarded when XP is edited
 class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
