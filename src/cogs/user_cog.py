@@ -5,8 +5,6 @@ from src.services.db_manager import DBManager
 
 
 # TODO POC: Levels based on OSRS scaling? Add XP bonus on each level up?
-# TODO POC: Store activity record history,
-#   allow users to view recent activity so they can edit and view progress
 class UserCog(commands.Cog):
     '''Cog for handling user registration and profile management.'''
 
@@ -65,6 +63,10 @@ class UserCog(commands.Cog):
             embed.set_footer(text=f'Last Updated: {updated_at}')
 
             await ctx.send(embed=embed)
+
+
+# TODO POC: Add history command to show historic XP gains across
+#  Activity Record Date Occurred in a UI of some sort
 
 
 async def setup(bot):

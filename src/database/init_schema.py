@@ -50,6 +50,7 @@ def init_schema(db: DBManager):
             note TEXT DEFAULT NULL,
             date_occurred DATE DEFAULT CURRENT_DATE,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
             FOREIGN KEY (activity_id) REFERENCES activities(id)
         )
@@ -80,8 +81,16 @@ def init_schema(db: DBManager):
         'CREATE INDEX IF NOT EXISTS idx_activity_records_created_at '
         'ON activity_records(created_at);'
     )
+    db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_activity_records_updated_at '
+        'ON activity_records(updated_at);'
+    )
+    db.execute(
+        'CREATE INDEX IF NOT EXISTS idx_activity_records_date_occurred '
+        'ON activity_records(date_occurred);'
+    )
 
-    # --- TRIGGER: Automatically award XP based on activity.xp_value ---
+    # --- TRIGGER: Automatically award XP when an activity record is created ---
     db.execute(
         '''
         CREATE TRIGGER IF NOT EXISTS award_activity_xp
@@ -93,6 +102,44 @@ def init_schema(db: DBManager):
             ),
             updated_at = CURRENT_TIMESTAMP
             WHERE id = NEW.user_id;
+        END;
+        '''
+    )
+
+    # --- TRIGGER: Adjust XP when an activity record changes ---
+    db.execute(
+        '''
+        CREATE TRIGGER IF NOT EXISTS adjust_activity_xp_on_update
+        AFTER UPDATE ON activity_records
+        WHEN OLD.activity_id != NEW.activity_id
+        BEGIN
+            -- Subtract old XP value and add new XP value
+            UPDATE users
+            SET total_xp = total_xp
+                - COALESCE(
+                    (SELECT xp_value FROM activities WHERE id = OLD.activity_id), 0
+                  )
+                + COALESCE(
+                    (SELECT xp_value FROM activities WHERE id = NEW.activity_id), 0
+                  ),
+                updated_at = CURRENT_TIMESTAMP
+            WHERE id = NEW.user_id;
+        END;
+        '''
+    )
+
+    # --- TRIGGER: Revoke XP when an activity record is deleted ---
+    db.execute(
+        '''
+        CREATE TRIGGER IF NOT EXISTS revoke_activity_xp_on_delete
+        AFTER DELETE ON activity_records
+        BEGIN
+            UPDATE users
+            SET total_xp = total_xp - COALESCE(
+                (SELECT xp_value FROM activities WHERE id = OLD.activity_id), 0
+            ),
+            updated_at = CURRENT_TIMESTAMP
+            WHERE id = OLD.user_id;
         END;
         '''
     )
@@ -116,6 +163,19 @@ def init_schema(db: DBManager):
         AFTER UPDATE ON activities
         BEGIN
             UPDATE activities SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
+        END;
+        '''
+    )
+
+    # --- TRIGGER: Automatically update updated_at on activity_record changes ---
+    db.execute(
+        '''
+        CREATE TRIGGER IF NOT EXISTS update_activity_record_timestamp
+        AFTER UPDATE ON activity_records
+        BEGIN
+            UPDATE activity_records
+            SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = NEW.id;
         END;
         '''
     )

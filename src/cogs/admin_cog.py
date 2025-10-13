@@ -1,7 +1,7 @@
 from discord.ext import commands
 
+from src.components import ResetConfirmView
 from src.services.db_manager import DBManager
-from src.utils.views import ResetConfirmView
 
 
 # TODO POC: Add Admin commands to allow add/edit/archive of Activities

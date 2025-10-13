@@ -1,7 +1,7 @@
 from discord.ext import commands
 
+from src.components.leaderboard import leaderboard_embed
 from src.services.db_manager import DBManager
-from src.utils.embeds import leaderboard_embed
 
 
 class LeaderboardCog(commands.Cog):
