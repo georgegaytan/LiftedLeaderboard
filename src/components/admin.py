@@ -1,63 +1,9 @@
 import discord
 from discord import Interaction
 
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 
 
-class BaseConfirmView(discord.ui.View):
-    '''Base confirmation view with confirm/cancel buttons.'''
-
-    def __init__(
-        self,
-        *,
-        timeout: int = 30,
-        confirm_label: str = '✅ Confirm',
-        cancel_label: str = '❌ Cancel',
-    ):
-        super().__init__(timeout=timeout)
-        self.value: bool | None = None
-        self.confirm_label = confirm_label
-        self.cancel_label = cancel_label
-
-    async def on_timeout(self):
-        for child in self.children:
-            child.disabled = True
-        if hasattr(self, 'message'):
-            await self.message.edit(content='⏰ Confirmation timed out.', view=self)
-
-    @discord.ui.button(label='✅ Confirm', style=discord.ButtonStyle.danger)
-    async def confirm(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await interaction.response.edit_message(content='✅ Confirmed.', view=None)
-        self.value = True
-        self.stop()
-
-    @discord.ui.button(label='❌ Cancel', style=discord.ButtonStyle.secondary)
-    async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button):
-        await interaction.response.edit_message(content='❌ Canceled.', view=None)
-        self.value = False
-        self.stop()
-
-
-class ResetConfirmView(BaseConfirmView):
-    '''Specialized confirmation for leaderboard resets'''
-
-    def __init__(self):
-        super().__init__(timeout=30)
-
-    @discord.ui.button(label='⚠️ Confirm Reset', style=discord.ButtonStyle.danger)
-    async def confirm(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ):
-        await interaction.response.edit_message(
-            content='Reset confirmed. Clearing all XP...', view=None
-        )
-        self.value = True
-        self.stop()
-
-
-# TODO: DRY this up with the activity_records CategorySelect
 class CategorySelect(discord.ui.Select):
     '''Dropdown to select an existing category from the DB.'''
 
@@ -71,7 +17,6 @@ class CategorySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: Interaction):
-        '''When a category is chosen, open the modal to add the activity.'''
         selected_category = self.values[0]
         await interaction.response.send_modal(AddActivityModal(selected_category))
 
@@ -98,7 +43,6 @@ class AddActivityModal(discord.ui.Modal):
         self.category = category
 
     async def on_submit(self, interaction: Interaction):
-        '''Insert the new activity into the DB.'''
         name = str(self.activity_name.value).strip()
         xp_str = str(self.xp_value.value).strip()
 
@@ -116,9 +60,9 @@ class AddActivityModal(discord.ui.Modal):
             db.execute(
                 '''
                 INSERT INTO activities (name, category, xp_value)
-                VALUES (?, ?, ?)
+                VALUES (%s, %s, %s)
                 ON CONFLICT (name)
-                DO UPDATE SET xp_value = excluded.xp_value
+                DO UPDATE SET xp_value = EXCLUDED.xp_value
                 ''',
                 (name, self.category, xp_value),
             )
@@ -182,11 +126,10 @@ class ActivityEditModal(discord.ui.Modal):
             )
             return
 
-        # Attempt update; handle unique name conflicts gracefully
         with DBManager() as db:
             try:
                 row = db.fetchone(
-                    'SELECT category FROM activities WHERE id = ?', (self.activity_id,)
+                    'SELECT category FROM activities WHERE id = %s', (self.activity_id,)
                 )
                 current_category = row['category'] if row else None
                 final_category = (
@@ -195,8 +138,11 @@ class ActivityEditModal(discord.ui.Modal):
                     else current_category
                 )
                 db.execute(
-                    'UPDATE activities SET name = ?, xp_value = ?, category = ? '
-                    'WHERE id = ?',
+                    '''
+                    UPDATE activities
+                    SET name = %s, xp_value = %s, category = %s
+                    WHERE id = %s
+                    ''',
                     (name, xp_val, final_category, self.activity_id),
                 )
             except Exception as e:
@@ -238,7 +184,6 @@ class ActivityEditView(discord.ui.View):
             self.activity_is_archived = bool(init_activities[0]['is_archived'])
 
         self.category_select = ActivityCategorySelect(categories)
-        # mark default on current category
         self.category_select.options = [
             discord.SelectOption(
                 label=c, value=c, default=(c == self.selected_category)
@@ -269,8 +214,12 @@ class ActivityEditView(discord.ui.View):
     def _fetch_categories(self) -> list[str]:
         with DBManager() as db:
             rows = db.fetchall(
-                'SELECT DISTINCT category FROM activities '
-                'ORDER BY category ASC LIMIT 25'
+                '''
+                SELECT DISTINCT category
+                FROM activities
+                ORDER BY category ASC
+                LIMIT 25
+                '''
             )
         return [r['category'] for r in rows]
 
@@ -279,8 +228,13 @@ class ActivityEditView(discord.ui.View):
             return []
         with DBManager() as db:
             rows: list[dict] = db.fetchall(
-                'SELECT id, name, xp_value, is_archived FROM activities '
-                'WHERE category = ? ORDER BY name ASC LIMIT 25',
+                '''
+                SELECT id, name, xp_value, is_archived
+                FROM activities
+                WHERE category = %s
+                ORDER BY name ASC
+                LIMIT 25
+                ''',
                 (category,),
             )
         return rows
@@ -308,7 +262,6 @@ class ActivityCategorySelect(discord.ui.Select):
         view.selected_category = self.values[0]
         activities = view._fetch_activities(view.selected_category)
 
-        # Rebuild category select to ensure defaults are respected by the client
         new_cat = ActivityCategorySelect([o.value for o in self.options])
         new_cat.options = [
             discord.SelectOption(
@@ -385,7 +338,7 @@ class ActivityNameSelect(discord.ui.Select):
         view.activity_id = int(self.values[0])
         with DBManager() as db:
             row = db.fetchone(
-                'SELECT name, is_archived FROM activities WHERE id = ?',
+                'SELECT name, is_archived FROM activities WHERE id = %s',
                 (view.activity_id,),
             )
             view.selected_activity = row['name'] if row else ''
@@ -421,7 +374,6 @@ class NewCategorySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: Interaction):
-        # No immediate action; UpdateCategoryButton will persist
         await interaction.response.defer()
 
 
@@ -450,13 +402,13 @@ class ArchiveButton(discord.ui.Button):
             return
 
         with DBManager() as db:
-            new_flag = 0 if v.activity_is_archived else 1
+            new_flag = not v.activity_is_archived
             db.execute(
-                'UPDATE activities SET is_archived = ? WHERE id = ?',
+                'UPDATE activities SET is_archived = %s WHERE id = %s',
                 (new_flag, v.activity_id),
             )
 
-        v.activity_is_archived = not v.activity_is_archived
+        v.activity_is_archived = new_flag
         self.label = 'Unarchive' if v.activity_is_archived else 'Archive'
         self.style = (
             discord.ButtonStyle.secondary
@@ -495,10 +447,10 @@ class ContinueEditButton(discord.ui.Button):
             )
             return
 
-        # fetch current details
         with DBManager() as db:
             row = db.fetchone(
-                'SELECT name, xp_value FROM activities WHERE id = ?', (v.activity_id,)
+                'SELECT name, xp_value FROM activities WHERE id = %s',
+                (v.activity_id,),
             )
         if not row:
             await interaction.response.send_message(

@@ -1,4 +1,4 @@
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 
 LEVEL_THRESHOLDS = [
     (1, 0),
@@ -106,8 +106,9 @@ LEVEL_THRESHOLDS = [
 def up(db_manager: DBManager):
     db_manager.executemany(
         '''
-        INSERT OR IGNORE INTO level_thresholds (level, xp_required)
-        VALUES (?, ?)
+        INSERT INTO level_thresholds (level, xp_required)
+        VALUES (%s, %s)
+        ON CONFLICT (level) DO NOTHING
         ''',
         LEVEL_THRESHOLDS,
     )

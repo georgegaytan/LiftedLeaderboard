@@ -2,7 +2,7 @@ from discord import Interaction, app_commands
 from discord.ext import commands
 
 from src.components.leaderboard import leaderboard_embed
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 
 
 class LeaderboardCog(commands.Cog):
@@ -25,7 +25,7 @@ class LeaderboardCog(commands.Cog):
                 SELECT display_name, level, total_xp
                 FROM users
                 ORDER BY total_xp DESC
-                LIMIT ?
+                LIMIT %s
                 ''',
                 (lim,),
             )

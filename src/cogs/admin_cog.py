@@ -1,44 +1,13 @@
 from discord import Interaction, app_commands
 from discord.ext import commands
 
-from src.components.admin import ActivityEditView, CategorySelectView, ResetConfirmView
-from src.services.db_manager import DBManager
+from src.components.admin import ActivityEditView, CategorySelectView
+from src.database.db_manager import DBManager
 
 
 class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
-
-    @app_commands.command(
-        name='reset_xp',
-        description='Admin-only command to reset all XP data (with confirmation).',
-    )
-    @app_commands.checks.has_permissions(administrator=True)
-    async def reset_xp(self, interaction: Interaction):
-        '''Admin-only command to reset all XP data (with confirmation).'''
-        view = ResetConfirmView()
-
-        await interaction.response.send_message(
-            '⚠️ Are you sure you want to reset all XP? This cannot be undone.',
-            view=view,
-            ephemeral=True,
-        )
-
-        await view.wait()
-
-        if view.value:
-            with DBManager() as db:
-                db.execute('DELETE FROM logs')
-
-            await interaction.followup.send(
-                '✅ All XP has been reset!',
-                ephemeral=True,
-            )
-        else:
-            await interaction.followup.send(
-                '❌ XP reset canceled.',
-                ephemeral=True,
-            )
 
     @app_commands.command(
         name='add_activity', description='Admin-only command to add new activity.'
@@ -77,7 +46,8 @@ class AdminCog(commands.Cog):
         with DBManager() as db:
             cat_rows = db.fetchall(
                 'SELECT DISTINCT category '
-                'FROM activities WHERE is_archived = 0 LIMIT 25'
+                'FROM activities WHERE is_archived = %s LIMIT 25',
+                (False,),
             )
             if not cat_rows:
                 await interaction.response.send_message(
@@ -87,7 +57,8 @@ class AdminCog(commands.Cog):
                 )
                 return
             any_activity = db.fetchone(
-                'SELECT 1 FROM activities WHERE is_archived = 0 LIMIT 1'
+                'SELECT 1 FROM activities WHERE is_archived = %s LIMIT 1',
+                (False,),
             )
             if not any_activity:
                 await interaction.response.send_message(

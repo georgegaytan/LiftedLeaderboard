@@ -2,8 +2,8 @@ import importlib.util
 import logging
 import os
 
-from src.database.init_schema import init_schema
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
+from src.database.postgres_bootstrap import init_schema_pg  # type: ignore
 
 logger = logging.getLogger(__name__)
 
@@ -11,12 +11,18 @@ logger = logging.getLogger(__name__)
 def run(db: DBManager):
     '''Run full DB setup: schema + migrations.'''
     # Step 1: Create database and tables
-    init_schema(db)
-    logger.info('Database and tables created/verified.')
-
-    # Step 2: Optional: Verify tables exist
-    tables = db.fetchall('SELECT name FROM sqlite_master WHERE type="table";')
-    logger.info(f'Current tables in DB: {[t["name"] for t in tables]}')
+    init_schema_pg(db)
+    logger.info('Postgres database and tables created/verified.')
+    # Verify tables (Postgres)
+    tables = db.fetchall(
+        '''
+        SELECT tablename AS name
+        FROM pg_catalog.pg_tables
+        WHERE schemaname = 'public'
+        ORDER BY tablename
+        '''
+    )
+    logger.info(f"Current tables in DB: {[t['name'] for t in tables]}")
 
     # Step 3: Run migrations
     migrations_dir = os.path.join(
@@ -55,7 +61,7 @@ def run(db: DBManager):
             if hasattr(migration, 'up'):
                 logger.info(f'Running migration: {filename}')
                 migration.up(db)
-                db.execute('INSERT INTO migrations (filename) VALUES (?)', (filename,))
+                db.execute('INSERT INTO migrations (filename) VALUES (%s)', (filename,))
             else:
                 logger.error(f'⚠️ Skipping {filename}: no `up()` function found.')
 

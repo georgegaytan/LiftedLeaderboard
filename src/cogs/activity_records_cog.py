@@ -1,11 +1,11 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 import discord
 from discord import Interaction, app_commands
 from discord.ext import commands
 
 from src.components.activity_records import RecentRecordsView
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 
 
 class ActivityRecordsCog(commands.Cog):
@@ -20,7 +20,7 @@ class ActivityRecordsCog(commands.Cog):
                 '''
                 SELECT DISTINCT category
                 FROM activities
-                WHERE category LIKE ? AND is_archived = 0
+                WHERE category LIKE %s AND is_archived = FALSE
                 ORDER BY category ASC
                 LIMIT 25
                 ''',
@@ -44,7 +44,7 @@ class ActivityRecordsCog(commands.Cog):
                 '''
                 SELECT name
                 FROM activities
-                WHERE category = ? AND name LIKE ? AND is_archived = 0
+                WHERE category = %s AND name LIKE %s AND is_archived = FALSE
                 ORDER BY name ASC
                 LIMIT 25
                 ''',
@@ -95,7 +95,7 @@ class ActivityRecordsCog(commands.Cog):
             db.execute(
                 '''
                 INSERT INTO users (id, display_name)
-                VALUES (?, ?)
+                VALUES (%s, %s)
                 ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name
                 ''',
                 (user_id, display_name),
@@ -103,18 +103,19 @@ class ActivityRecordsCog(commands.Cog):
 
             # --- Daily bonus check (first record today) ---
             check_bonus = False
-            today_str = date.today().isoformat()
+            today_str = datetime.now(timezone.utc).date().isoformat()
             if date_value == today_str:
                 already_row = db.fetchone(
                     'SELECT 1 FROM activity_records '
-                    'WHERE user_id = ? AND date_occurred = ? LIMIT 1',
+                    'WHERE user_id = %s AND date_occurred = %s LIMIT 1',
                     (user_id, today_str),
                 )
                 check_bonus = already_row is None
 
             # --- Lookup activity ---
             activity_row = db.fetchone(
-                'SELECT id, xp_value FROM activities WHERE name = ? AND category = ?',
+                'SELECT id, xp_value FROM activities '
+                'WHERE name = %s AND category = %s AND is_archived = FALSE',
                 (activity, category),
             )
 
@@ -131,7 +132,7 @@ class ActivityRecordsCog(commands.Cog):
             db.execute(
                 '''
                 INSERT INTO activity_records (user_id, activity_id, note, date_occurred)
-                VALUES (?, ?, ?, ?)
+                VALUES (%s, %s, %s, %s)
                 ''',
                 (user_id, activity_id, note, date_value),
             )
@@ -149,7 +150,7 @@ class ActivityRecordsCog(commands.Cog):
                 db.execute(
                     'UPDATE users '
                     'SET total_xp = total_xp + 10, updated_at = CURRENT_TIMESTAMP '
-                    'WHERE id = ?',
+                    'WHERE id = %s',
                     (user_id,),
                 )
                 message += '\n🎁 Daily bonus: +10 XP'
@@ -201,9 +202,9 @@ class ActivityRecordsCog(commands.Cog):
                        a.xp_value AS xp_value
                 FROM activity_records ar
                 JOIN activities a ON a.id = ar.activity_id
-                WHERE ar.user_id = ?
+                WHERE ar.user_id = %s AND a.is_archived = FALSE
                 {order_clause}
-                LIMIT ?
+                LIMIT %s
                 ''',
                 (user_id, lim),
             )

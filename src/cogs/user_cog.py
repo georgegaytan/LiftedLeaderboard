@@ -2,7 +2,7 @@ import discord
 from discord import Interaction, app_commands
 from discord.ext import commands
 
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 from src.utils.helper import level_to_rank
 
 
@@ -23,7 +23,7 @@ class UserCog(commands.Cog):
 
         with DBManager() as db:
             # Check if the user already exists
-            existing = db.fetchone('SELECT id FROM users WHERE id = ?', (user_id,))
+            existing = db.fetchone('SELECT id FROM users WHERE id = %s', (user_id,))
             if existing:
                 await interaction.response.send_message(
                     f'✅ {interaction.user.mention}, you’re already registered!',
@@ -35,7 +35,7 @@ class UserCog(commands.Cog):
             db.execute(
                 '''
                 INSERT INTO users (id, display_name)
-                VALUES (?, ?)
+                VALUES (%s, %s)
                 ON CONFLICT(id) DO UPDATE SET display_name = excluded.display_name
                 ''',
                 (user_id, display_name),
@@ -60,7 +60,7 @@ class UserCog(commands.Cog):
             user = db.fetchone(
                 'SELECT display_name, total_xp, level, updated_at '
                 'FROM users '
-                'WHERE id = ?',
+                'WHERE id = %s',
                 (user_id,),
             )
 
@@ -70,17 +70,16 @@ class UserCog(commands.Cog):
                 )
                 return
 
-            display_name, total_xp, level, updated_at = user
-            lvl = max(1, int(level))
+            lvl = max(1, int(user['level']))
 
             embed = discord.Embed(
-                title=f"{display_name}'s Profile",
+                title=f"{user['display_name']}'s Profile",
                 color=discord.Color.blurple(),
             )
             embed.add_field(name='Level', value=lvl)
             embed.add_field(name='Rank', value=level_to_rank(lvl))
-            embed.add_field(name='Total XP', value=total_xp)
-            embed.set_footer(text=f'Last Updated: {updated_at}')
+            embed.add_field(name='Total XP', value=user['total_xp'])
+            embed.set_footer(text=f'Last Updated: {user["updated_at"]}')
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 

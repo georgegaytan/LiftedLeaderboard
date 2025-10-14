@@ -5,7 +5,7 @@ from datetime import date
 import discord
 from discord import Interaction
 
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 
 
 class RecordEditModal(discord.ui.Modal):
@@ -60,8 +60,8 @@ class RecordEditModal(discord.ui.Modal):
             db.execute(
                 '''
                 UPDATE activity_records
-                SET activity_id = ?, note = ?, date_occurred = ?
-                WHERE id = ?
+                SET activity_id = %s, note = %s, date_occurred = %s
+                WHERE id = %s
                 ''',
                 (
                     self.staged_activity_id,
@@ -83,7 +83,6 @@ class DeleteConfirmModal(discord.ui.Modal):
         super().__init__(title='Confirm Delete')
         self.record_id = record_id
 
-        # A single text input just to confirm
         self.confirm_input = discord.ui.TextInput(
             label='Type DELETE to confirm',
             style=discord.TextStyle.short,
@@ -99,9 +98,8 @@ class DeleteConfirmModal(discord.ui.Modal):
             )
             return
 
-        # Delete the record
         with DBManager() as db:
-            db.execute('DELETE FROM activity_records WHERE id = ?', (self.record_id,))
+            db.execute('DELETE FROM activity_records WHERE id = %s', (self.record_id,))
 
         await interaction.response.send_message(
             '✅ Record deleted successfully!', ephemeral=True
@@ -117,7 +115,10 @@ class RecentRecordsView(discord.ui.View):
         options = []
         for idx, r in enumerate(records, start=1):
             label = f"{idx}. {r['activity_name']}"
-            description = f"{r['category']} • {r['date_occurred']}"
+            # Coerce date to ISO string for Discord component JSON
+            d = r['date_occurred']
+            d_str = d.isoformat() if isinstance(d, date) else str(d)
+            description = f"{r['category']} • {d_str}"
             options.append(
                 discord.SelectOption(
                     label=label, description=description, value=str(r['id'])
@@ -176,7 +177,9 @@ class RecordEditView(discord.ui.View):
         self.selected_category: str = record['category']
         self.selected_activity: str = record['activity_name']
         self.current_note: str | None = record['note']
-        self.current_date: str = record['date_occurred']
+        # Ensure current_date is a string (Postgres DATE may come as date object)
+        d = record['date_occurred']
+        self.current_date: str = d.isoformat() if isinstance(d, date) else str(d)
 
         categories = self._fetch_categories()
         activities = self._fetch_activities(self.selected_category)
@@ -200,11 +203,13 @@ class RecordEditView(discord.ui.View):
     def _fetch_categories(self) -> list[str]:
         with DBManager() as db:
             rows = db.fetchall(
-                'SELECT DISTINCT category '
-                'FROM activities '
-                'WHERE is_archived = 0 '
-                'ORDER BY category ASC '
-                'LIMIT 25'
+                '''
+                SELECT DISTINCT category
+                FROM activities
+                WHERE is_archived = FALSE
+                ORDER BY category ASC
+                LIMIT 25
+                '''
             )
         return [r['category'] for r in rows]
 
@@ -213,11 +218,13 @@ class RecordEditView(discord.ui.View):
             return []
         with DBManager() as db:
             rows = db.fetchall(
-                'SELECT name '
-                'FROM activities '
-                'WHERE category = ? AND is_archived = 0 '
-                'ORDER BY name ASC '
-                'LIMIT 25',
+                '''
+                SELECT name
+                FROM activities
+                WHERE category = %s AND is_archived = FALSE
+                ORDER BY name ASC
+                LIMIT 25
+                ''',
                 (category,),
             )
         return [r['name'] for r in rows]
@@ -241,14 +248,12 @@ class CategorySelect(discord.ui.Select):
             )
             return
         v.selected_category = self.values[0]
-        # Update category select defaults
         v.category_select.options = [
             discord.SelectOption(
                 label=c.label, value=c.value, default=(c.value == v.selected_category)
             )
             for c in self.options
         ]
-        # Refresh activities
         activities = v._fetch_activities(v.selected_category)
         v.selected_activity = activities[0] if activities else ''
         v.activity_select.options = [
@@ -292,7 +297,6 @@ class DeleteButton(discord.ui.Button):
             )
             return
 
-        # Show confirmation modal
         modal = DeleteConfirmModal(record_id=v.record['id'])
         await interaction.response.send_modal(modal)
 
@@ -324,7 +328,7 @@ class ContinueButton(discord.ui.Button):
                 '''
                 SELECT id
                 FROM activities
-                WHERE category = ? AND name = ? AND is_archived = 0
+                WHERE category = %s AND name = %s AND is_archived = FALSE
                 ''',
                 (category, activity_name),
             )
@@ -335,7 +339,6 @@ class ContinueButton(discord.ui.Button):
             )
             return
 
-        # Pass staged data to modal without saving yet
         modal = RecordEditModal(
             record_id=v.record['id'],
             staged_activity_id=row['id'],

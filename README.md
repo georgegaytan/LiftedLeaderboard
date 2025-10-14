@@ -6,43 +6,59 @@ A Discord wellness leaderboard bot that tracks wellness logs, awards XP, and sho
 
 ```
 LiftedLeaderboard/
+├── main.py                         # Entry point: loads .env, initializes DB, starts bot
 ├── src/
-│   ├── bot.py                 # Main script
-│   ├── cogs/                  # Discord command modules
-│   │   ├── *_cog.py           # ...
-│   ├── models/                # Data models
-│   │   ├── *.py               # ...
-│   ├── database/              # Database setup & migrations
-│   │   ├── schema.py          # Database schema creation
-│   │   ├── setup.py           # Database initialization script
-│   │   └── migrations/        # Future database migrations
-│   │       └── README.md      # Migration guidelines
-│   ├── services/
-│   │   ├── db_manager.py      # Runtime DB operations
-│   │   └── scheduler.py       # Scheduled tasks
+│   ├── bot.py                      # Discord client bootstrapping and cog loading
+│   ├── cogs/                       # Slash command cogs
+│   │   ├── activity_records_cog.py # /record, /recent (activity logging and views)
+│   │   ├── leaderboard_cog.py      # /leaderboard
+│   │   ├── user_cog.py             # /register, /profile
+│   │   └── admin_cog.py            # Admin entry commands (category/activity management)
+│   ├── components/                 # Discord UI components (Views/Modals/Embeds)
+│   │   ├── activity_records.py     # Recent records view, edit/delete modals
+│   │   ├── admin.py                # Activity/category admin editor views
+│   │   └── leaderboard.py          # Leaderboard embed helpers
+│   ├── database/                   # Database bootstrap and migrations
+│   │   ├── start_db.py             # Runs schema init + migrations at startup
+│   │   ├── create_migration.py     # Creates timestamped DB/Data migration template
+│   │   ├── db_manager.py           # Postgres-only DB manager (psycopg)
+│   │   ├── postgres_bootstrap.py   # Postgres DDL, indexes, triggers/functions
+│   │   └── migrations/             # Migration scripts (Python)
 │   └── utils/
-│       ├── constants.py
-│       ├── embeds.py          # Embeds formatted for Discord
-│       └── views.py           # Views for User notifications/input
-├── data/                      # DB File is stored here
-├── tests/
-├── main.py                    # Alternative entry point
-├── requirements.txt           # Python dependencies
-└── README.md                  # This file
+│       ├── logs.py                 # Logging setup
+│       ├── constants.py            # Constants, ranks, messages
+│       └── helper.py               # Small helpers (e.g., level_to_rank)
+├── requirements.txt                # Python dependencies
+└── README.md
 ```
 
 ## Commands
-TODO: Command docs
+
+- **/register**
+  - Registers the invoking user in `users` (idempotent; updates display name on conflict).
+- **/profile [member]**
+  - Shows level, rank, and total XP for you or the specified member.
+- **/leaderboard [top]**
+  - Top users by `total_xp` (default 10, max 50).
+- **/record category activity [note] [date]**
+  - Records an activity occurrence, awards XP via triggers.
+  - Optional daily bonus applies for the first record of the day.
+- **/recent [limit] [sort_by]**
+  - Shows your recent records with edit/delete UI (occurred/created/updated sort).
+- **Admin (from `admin_cog.py` and `components/admin.py`)**
+  - Manage activities: add or edit name/xp/category/is_archived
 
 ## Requirements
 
 - **Python**: 3.11+
+- **PostgreSQL**: Managed instance (e.g., Neon or local). SSL recommended.
+- **psycopg**: `psycopg[binary,pool]`
 
 ## Setup
 
-### 1️⃣ Install Dependencies
+### 1) Create and activate a virtual environment
 
-**Windows PowerShell:**
+- Windows PowerShell:
 ```powershell
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
@@ -50,7 +66,7 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-**macOS/Linux:**
+- macOS/Linux:
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
@@ -58,40 +74,42 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-### 2️⃣ Install Pre-Commit Hooks (Recommended)
+### 2) Environment variables (.env)
 
-This project uses pre-commit to automatically check code style, linting, and formatting before commits.
-
-To enable it:
-```bash
-pip install pre-commit
-pre-commit install
-```
-This installs the git hooks defined in .pre-commit-config.yaml.
-You can manually run the checks on all files at any time with:
-```bash
-pre-commit run --all-files
-```
-
-
-### 3️⃣ Configure Environment
-
-Create a `.env` file in the root of the project:
+Create a `.env` file at the project root:
 
 ```env
 DISCORD_TOKEN=your-bot-token
-GUILD_ID=1234567890
-WEATHER_API_KEY=optional
+# Optional: limit to a single guild during development
+# GUILD_ID=123456789012345678
+
+# Postgres connection string (No need for sslmode if local)
+DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 ```
 
+Notes:
+- `main.py` loads `.env` and `DBManager` reads `DATABASE_URL` at runtime.
 
-### 4️⃣ Run the Bot
+### 3) Run Bot
 
-The bot uses SQLite. SQLite isn't a server, it's a minimalist approach that operates off of a single DB file.
-That file is stored at `data/wellness.db`. The DB is initialized on startup.
+The entrypoint `main.py` will initialize schema and run any new migrations, then start the bot.
 
 ```bash
+python main.py
+```
+
+If you prefer module execution:
+```bash
 python -m src.bot
+```
+
+## Development
+
+- Optional pre-commit hooks:
+```bash
+pip install pre-commit
+pre-commit install
+pre-commit run --all-files
 ```
 
 ## Tests

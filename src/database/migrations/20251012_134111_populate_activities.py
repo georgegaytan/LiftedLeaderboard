@@ -2,7 +2,7 @@
 DB Migration: Populate activities table with default activities and XP
 '''
 
-from src.services.db_manager import DBManager
+from src.database.db_manager import DBManager
 
 # List of activities: (category, name, xp_value)
 ACTIVITIES = [
@@ -58,8 +58,9 @@ def up(db_manager: DBManager):
     for category, name, xp in ACTIVITIES:
         db_manager.execute(
             '''
-            INSERT OR IGNORE INTO activities (category, name, xp_value)
-            VALUES (?, ?, ?)
+            INSERT INTO activities (category, name, xp_value)
+            VALUES (%s, %s, %s)
+            ON CONFLICT (name) DO NOTHING
             ''',
             (category, name, xp),
         )
