@@ -9,8 +9,8 @@ from src.database.db_manager import DBManager
 from src.utils.logs import setup_logging
 
 # TODO: Go over Code again and clean up long files, DRY things, and make helpers
-# TODO POC: Setup git releases, issues/branches for features,
-#  and deploy the latest main on Prod Bot on a Simple Railway Setup
+# TODO POC: Setup git releases, issues for TODOs,
+#  and deploy the latest main to Prod Bot on a Railway Setup (need .env.local/prod)
 if __name__ == '__main__':
     setup_logging(logging.INFO)
     load_dotenv()
