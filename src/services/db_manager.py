@@ -2,7 +2,7 @@ import logging
 import os
 import sqlite3
 from functools import wraps
-from typing import Any, Callable, Iterable, List, Optional
+from typing import Any, Callable, Iterable, List, Optional, Sequence
 
 logger = logging.getLogger(__name__)
 
@@ -49,12 +49,26 @@ class DBManager:
 
     @require_connection
     def execute(self, query: str, params: Iterable | None = None) -> None:
-        '''Execute a write operation (INSERT, UPDATE, DELETE).'''
+        '''Execute a single write operation (INSERT, UPDATE, DELETE).'''
         try:
             self.conn.execute(query, tuple(params or ()))  # type: ignore[union-attr]
         except sqlite3.Error as e:
             logger.error(
                 f'SQLite execute() error: {e}\nQuery: {query}\nParams: {params}'
+            )
+            raise
+
+    @require_connection
+    def executemany(self, query: str, param_list: Iterable[Sequence[Any]]) -> None:
+        '''Execute a query against multiple sets of parameters.'''
+        try:
+            self.conn.executemany(  # type: ignore[arg-type, union-attr]
+                query,
+                param_list,
+            )
+        except sqlite3.Error as e:
+            logger.error(
+                f'SQLite executemany() error: {e}\nQuery: {query}\nParams: {param_list}'
             )
             raise
 

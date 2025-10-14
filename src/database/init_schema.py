@@ -57,6 +57,16 @@ def init_schema(db: DBManager):
         '''
     )
 
+    # --- LEVEL THRESHOLDS TABLE ---
+    db.execute(
+        '''
+        CREATE TABLE IF NOT EXISTS level_thresholds (
+            level INTEGER PRIMARY KEY,
+            xp_required INTEGER NOT NULL
+        )
+        '''
+    )
+
     # --- MIGRATIONS TABLE ---
     db.execute(
         '''
@@ -175,6 +185,24 @@ def init_schema(db: DBManager):
         BEGIN
             UPDATE activity_records
             SET updated_at = CURRENT_TIMESTAMP
+            WHERE id = NEW.id;
+        END;
+        '''
+    )
+
+    # --- TRIGGER: Auto-update level based on total XP ---
+    db.execute(
+        '''
+        CREATE TRIGGER IF NOT EXISTS update_user_level_on_xp_change
+        AFTER UPDATE OF total_xp ON users
+        BEGIN
+            UPDATE users
+            SET level = (
+                SELECT MAX(level)
+                FROM level_thresholds
+                WHERE xp_required <= NEW.total_xp
+            ),
+            updated_at = CURRENT_TIMESTAMP
             WHERE id = NEW.id;
         END;
         '''
