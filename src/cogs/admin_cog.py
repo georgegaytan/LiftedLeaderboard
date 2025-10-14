@@ -1,12 +1,10 @@
 from discord import Interaction, app_commands
 from discord.ext import commands
 
-from src.components.admin import CategorySelectView, ResetConfirmView
+from src.components.admin import ActivityEditView, CategorySelectView, ResetConfirmView
 from src.services.db_manager import DBManager
 
 
-# TODO POC: Add Admin commands to allow edit/archive of Activities
-#   Remember to ensure Triggers update historic XP awarded when XP is edited
 class AdminCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -67,6 +65,44 @@ class AdminCog(commands.Cog):
                 view=view,
                 ephemeral=True,
             )
+
+    @app_commands.command(
+        name='edit_activity',
+        description='Admin-only command to edit or archive an existing activity.',
+    )
+    @app_commands.checks.has_permissions(administrator=True)
+    async def edit_activity(self, interaction: Interaction):
+        '''Admin-only command to edit or archive an existing activity.'''
+        # Ensure we have categories and at least one unarchived activity
+        with DBManager() as db:
+            cat_rows = db.fetchall(
+                'SELECT DISTINCT category '
+                'FROM activities WHERE is_archived = 0 LIMIT 25'
+            )
+            if not cat_rows:
+                await interaction.response.send_message(
+                    '⚠️ No categories found with active activities. '
+                    'Add activities first.',
+                    ephemeral=True,
+                )
+                return
+            any_activity = db.fetchone(
+                'SELECT 1 FROM activities WHERE is_archived = 0 LIMIT 1'
+            )
+            if not any_activity:
+                await interaction.response.send_message(
+                    '⚠️ No unarchived activities found. Add activities first.',
+                    ephemeral=True,
+                )
+                return
+
+        view = ActivityEditView(requestor_id=interaction.user.id)
+        await interaction.response.send_message(
+            'Select a Category and Activity to edit. '
+            'You can update its Category, Archive it, or Continue to edit Name/XP:',
+            view=view,
+            ephemeral=True,
+        )
 
 
 async def setup(bot: commands.Bot):

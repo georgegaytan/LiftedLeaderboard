@@ -5,8 +5,7 @@ from discord.ext import commands
 from src.services.db_manager import DBManager
 
 
-# TODO: Add history command to show historic XP gains across
-#  Activity Record Date Occurred with a visual (try matplotlib or plotly image upload?)
+# TODO: Add history command to give link to webapp with visuals for data
 # TODO POC: Levels based on OSRS scaling? Add XP bonus on each level up?
 class UserCog(commands.Cog):
     '''Cog for handling user registration and profile management.'''

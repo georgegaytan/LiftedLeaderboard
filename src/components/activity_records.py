@@ -12,12 +12,18 @@ class RecordEditModal(discord.ui.Modal):
     def __init__(
         self,
         record_id: int,
+        staged_activity_id: int,
+        staged_category: str,
+        staged_activity_name: str,
         current_note: str | None,
         current_date: str,
         parent_view: RecordEditView | None = None,
     ):
         super().__init__(title='Edit Note/Date')
         self.record_id = record_id
+        self.staged_activity_id = staged_activity_id
+        self.staged_category = staged_category
+        self.staged_activity_name = staged_activity_name
         self.parent_view = parent_view
 
         self.note = discord.ui.TextInput(
@@ -39,7 +45,7 @@ class RecordEditModal(discord.ui.Modal):
         self.add_item(self.date_occurred)
 
     async def on_submit(self, interaction: Interaction):
-        note_val = str(self.note.value).strip() if self.note.value is not None else None
+        note_val = str(self.note.value).strip() if self.note.value else None
         date_val = str(self.date_occurred.value).strip()
 
         try:
@@ -50,15 +56,25 @@ class RecordEditModal(discord.ui.Modal):
             )
             return
 
-        # Update in DB immediately
         with DBManager() as db:
             db.execute(
-                'UPDATE activity_records SET note = ?, date_occurred = ? WHERE id = ?',
-                (note_val if note_val != '' else None, date_val, self.record_id),
+                '''
+                UPDATE activity_records
+                SET activity_id = ?, note = ?, date_occurred = ?
+                WHERE id = ?
+                ''',
+                (
+                    self.staged_activity_id,
+                    note_val if note_val != '' else None,
+                    date_val,
+                    self.record_id,
+                ),
             )
 
         await interaction.response.send_message(
-            '✅ Record updated successfully!', ephemeral=True
+            f'✅ Updated record: {self.staged_activity_name} ({self.staged_category}) '
+            f'on {date_val}',
+            ephemeral=True,
         )
 
 
@@ -303,28 +319,28 @@ class ContinueButton(discord.ui.Button):
             )
             return
 
-        # Persist category/activity changes first
         with DBManager() as db:
             row = db.fetchone(
-                'SELECT id '
-                'FROM activities '
-                'WHERE category = ? AND name = ? AND is_archived = 0',
+                '''
+                SELECT id
+                FROM activities
+                WHERE category = ? AND name = ? AND is_archived = 0
+                ''',
                 (category, activity_name),
             )
-            if not row:
-                await interaction.response.send_message(
-                    'Selected activity not found.', ephemeral=True
-                )
-                return
-            activity_id = row['id']
-            db.execute(
-                'UPDATE activity_records SET activity_id = ? WHERE id = ?',
-                (activity_id, v.record['id']),
-            )
 
-        # Now pop up the modal for note/date edit
+        if not row:
+            await interaction.response.send_message(
+                '❌ Selected activity not found.', ephemeral=True
+            )
+            return
+
+        # Pass staged data to modal without saving yet
         modal = RecordEditModal(
             record_id=v.record['id'],
+            staged_activity_id=row['id'],
+            staged_category=category,
+            staged_activity_name=activity_name,
             current_note=v.current_note,
             current_date=v.current_date,
             parent_view=v,
