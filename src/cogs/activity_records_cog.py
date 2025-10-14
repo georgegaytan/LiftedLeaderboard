@@ -101,6 +101,17 @@ class ActivityRecordsCog(commands.Cog):
                 (user_id, display_name),
             )
 
+            # --- Daily bonus check (first record today) ---
+            check_bonus = False
+            today_str = date.today().isoformat()
+            if date_value == today_str:
+                already_row = db.fetchone(
+                    'SELECT 1 FROM activity_records '
+                    'WHERE user_id = ? AND date_occurred = ? LIMIT 1',
+                    (user_id, today_str),
+                )
+                check_bonus = already_row is None
+
             # --- Lookup activity ---
             activity_row = db.fetchone(
                 'SELECT id, xp_value FROM activities WHERE name = ? AND category = ?',
@@ -132,6 +143,16 @@ class ActivityRecordsCog(commands.Cog):
                 message += f'\n📝 _{note}_'
             if date_occurred:
                 message += f'\n📅 Date: {date_value}'
+
+            # --- Apply daily bonus after successful record ---
+            if check_bonus:
+                db.execute(
+                    'UPDATE users '
+                    'SET total_xp = total_xp + 10, updated_at = CURRENT_TIMESTAMP '
+                    'WHERE id = ?',
+                    (user_id,),
+                )
+                message += '\n🎁 Daily bonus: +10 XP'
 
             await interaction.response.send_message(message)
 

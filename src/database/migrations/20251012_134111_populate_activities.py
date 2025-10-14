@@ -7,10 +7,14 @@ from src.services.db_manager import DBManager
 # List of activities: (category, name, xp_value)
 ACTIVITIES = [
     # === Steps ===
-    ('Steps', '5000 steps in a day', 5),
-    ('Steps', '10000 steps in a day', 10),
-    ('Steps', '35000 steps in a week', 5),
-    ('Steps', '70000 steps in a week', 10),
+    ('Steps', 'Daily Steps 5k+ (pick only one per day)', 5),
+    ('Steps', 'Daily Steps 10k+', 10),
+    ('Steps', 'Daily Steps 15k+', 15),
+    ('Steps', 'Daily Steps 20k+', 20),
+    ('Steps', 'Weekly Steps 35k+ (pick only one per week)', 5),
+    ('Steps', 'Weekly Steps 70k+', 10),
+    ('Steps', 'Weekly Steps 105k+', 15),
+    ('Steps', 'Daily Steps 140k+', 20),
     # === Hiking ===
     ('Hiking', '1 hour hiking', 3),
     ('Hiking', '2 hours hiking', 8),
