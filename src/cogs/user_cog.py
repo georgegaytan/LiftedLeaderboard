@@ -3,10 +3,10 @@ from discord import Interaction, app_commands
 from discord.ext import commands
 
 from src.services.db_manager import DBManager
+from src.utils.helper import level_to_rank
 
 
 # TODO: Add history command to give link to webapp with visuals for data
-# TODO POC: Levels based on OSRS scaling? Add XP bonus on each level up?
 class UserCog(commands.Cog):
     '''Cog for handling user registration and profile management.'''
 
@@ -71,11 +71,14 @@ class UserCog(commands.Cog):
                 return
 
             display_name, total_xp, level, updated_at = user
+            lvl = max(1, int(level))
+
             embed = discord.Embed(
                 title=f"{display_name}'s Profile",
                 color=discord.Color.blurple(),
             )
-            embed.add_field(name='Level', value=level)
+            embed.add_field(name='Level', value=lvl)
+            embed.add_field(name='Rank', value=level_to_rank(lvl))
             embed.add_field(name='Total XP', value=total_xp)
             embed.set_footer(text=f'Last Updated: {updated_at}')
 

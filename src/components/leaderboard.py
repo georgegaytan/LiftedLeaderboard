@@ -3,6 +3,7 @@ import random
 import discord
 
 from src.utils.constants import HEALTH_FACTS
+from src.utils.helper import level_to_rank
 
 
 def leaderboard_embed(entries: list[tuple[str, int, int]]) -> discord.Embed:
@@ -19,9 +20,10 @@ def leaderboard_embed(entries: list[tuple[str, int, int]]) -> discord.Embed:
 
     for i, (name, level, xp) in enumerate(entries):
         emoji = trophy_emojis[i] if i < 3 else f'{i + 1}.'
+        rank = level_to_rank(level)
         embed.add_field(
             name=f'{emoji} {name}',
-            value=f'Level: **{level}** | XP: **{xp}**',
+            value=f'Level: **{level}** | Rank: **{rank}** | XP: **{xp}**',
             inline=False,
         )
 

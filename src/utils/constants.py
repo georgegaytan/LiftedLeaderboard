@@ -33,3 +33,16 @@ HEALTH_FACTS = [
     'Daily steps count towards fitness, or at least prolonging your journey through joint pain.',  # noqa: E501
     'Josh Gordon',
 ]
+
+RANKS = [
+    (99, 'Max'),
+    (92, 'God'),
+    (70, 'Demon'),
+    (60, 'Dragon'),
+    (40, 'Rune'),
+    (30, 'Adamant'),
+    (20, 'Mithril'),
+    (10, 'Steel'),
+    (5, 'Iron'),
+    (1, 'Bronze'),
+]
