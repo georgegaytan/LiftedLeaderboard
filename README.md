@@ -74,21 +74,41 @@ pip install -U pip
 pip install -r requirements.txt
 ```
 
-### 2) Environment variables (.env)
+### 2) Environment variables (.env.local / .env.prod)
 
-Create a `.env` file at the project root:
+This project uses environment-specific files loaded by `src.utils.env.load_env()`:
 
+- **Selection rules**
+  - Use file from `ENV_FILE` if set (absolute or relative path).
+  - Else use `.env.prod` if `ENV` or `PYTHON_ENV` is `production`/`prod`.
+  - Else use `.env.local` (default for development).
+  - If the selected file is missing, a root `.env` (if present) is used as a fallback.
+
+- **Variables**
+  - `DISCORD_TOKEN` – Bot token.
+  - `GUILD_ID` – Optional guild to scope command sync during development.
+  - `DATABASE_URL` – PostgreSQL connection string.
+
+- **.env.local (example)**
 ```env
-DISCORD_TOKEN=your-bot-token
-# Optional: limit to a single guild during development
-# GUILD_ID=123456789012345678
+ENV=local
+DISCORD_TOKEN=your-local-bot-token
+GUILD_ID=123456789012345678
+DATABASE_URL=postgresql://postgres:password@localhost:5432/your_db
+```
 
-# Postgres connection string (No need for sslmode if local)
+- **.env.prod (example)**
+```env
+ENV=production
+DISCORD_TOKEN=your-production-bot-token
+GUILD_ID=987654321098765432
 DATABASE_URL=postgresql://USER:PASSWORD@HOST/DBNAME?sslmode=require
 ```
 
-Notes:
-- `main.py` loads `.env` and `DBManager` reads `DATABASE_URL` at runtime.
+- **Notes**
+  - OS environment vars take precedence over file values (unless `load_env(override=True)`).
+  - Files should generally not be committed. Consider adding to `.gitignore`:
+    - `.env`, `.env.*` (and keep a non-secret `.env.example` if desired).
 
 ### 3) Run Bot
 

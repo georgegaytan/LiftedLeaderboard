@@ -5,7 +5,8 @@ import pathlib
 
 import discord
 from discord.ext import commands
-from dotenv import load_dotenv
+
+from src.utils.env import load_env
 
 # --- Logging setup ---
 logging.basicConfig(
@@ -48,7 +49,7 @@ class LiftedLeaderboardBot(commands.Bot):
 
 
 async def main():
-    load_dotenv()
+    load_env()
     token = os.getenv('DISCORD_TOKEN')
     if not token:
         raise RuntimeError('DISCORD_TOKEN not set in environment or .env')
