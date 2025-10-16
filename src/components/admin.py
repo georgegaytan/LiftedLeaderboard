@@ -1,7 +1,7 @@
 import discord
 from discord import Interaction
 
-from src.database.db_manager import DBManager
+from src.models.activity import Activity
 
 
 class CategorySelect(discord.ui.Select):
@@ -56,16 +56,7 @@ class AddActivityModal(discord.ui.Modal):
             )
             return
 
-        with DBManager() as db:
-            db.execute(
-                '''
-                INSERT INTO activities (name, category, xp_value)
-                VALUES (%s, %s, %s)
-                ON CONFLICT (name)
-                DO UPDATE SET xp_value = EXCLUDED.xp_value
-                ''',
-                (name, self.category, xp_value),
-            )
+        Activity.upsert_activity(name=name, category=self.category, xp_value=xp_value)
 
         await interaction.response.send_message(
             f'✅ Activity **{name}** (Category: **{self.category}**) '
@@ -126,30 +117,27 @@ class ActivityEditModal(discord.ui.Modal):
             )
             return
 
-        with DBManager() as db:
-            try:
-                row = db.fetchone(
-                    'SELECT category FROM activities WHERE id = %s', (self.activity_id,)
-                )
-                current_category = row['category'] if row else None
-                final_category = (
-                    self.staged_new_category
-                    if self.staged_new_category
-                    else current_category
-                )
-                db.execute(
-                    '''
-                    UPDATE activities
-                    SET name = %s, xp_value = %s, category = %s
-                    WHERE id = %s
-                    ''',
-                    (name, xp_val, final_category, self.activity_id),
-                )
-            except Exception as e:
-                await interaction.response.send_message(
-                    f'❌ Failed to update activity: {e}', ephemeral=True
-                )
-                return
+        try:
+            row = Activity.get(self.activity_id)
+            current_category = row['category'] if row else None
+            final_category = (
+                self.staged_new_category
+                if self.staged_new_category
+                else current_category
+            )
+            Activity.update(
+                self.activity_id,
+                {
+                    'name': name,
+                    'xp_value': xp_val,
+                    'category': final_category,
+                },
+            )
+        except Exception as e:
+            await interaction.response.send_message(
+                f'❌ Failed to update activity: {e}', ephemeral=True
+            )
+            return
 
         await interaction.response.send_message(
             f'✅ Activity updated to **{name}** with **{xp_val} XP**.',
@@ -212,31 +200,14 @@ class ActivityEditView(discord.ui.View):
         return True
 
     def _fetch_categories(self) -> list[str]:
-        with DBManager() as db:
-            rows = db.fetchall(
-                '''
-                SELECT DISTINCT category
-                FROM activities
-                ORDER BY category ASC
-                LIMIT 25
-                '''
-            )
-        return [r['category'] for r in rows]
+        return Activity.list_categories(active_only=False, limit=25)
 
     def _fetch_activities(self, category: str) -> list[dict]:
         if not category:
             return []
-        with DBManager() as db:
-            rows: list[dict] = db.fetchall(
-                '''
-                SELECT id, name, xp_value, is_archived
-                FROM activities
-                WHERE category = %s
-                ORDER BY name ASC
-                LIMIT 25
-                ''',
-                (category,),
-            )
+        rows: list[dict] = Activity.list_by_category(
+            category, active_only=False, limit=25
+        )
         return rows
 
 
@@ -336,13 +307,9 @@ class ActivityNameSelect(discord.ui.Select):
             )
             return
         view.activity_id = int(self.values[0])
-        with DBManager() as db:
-            row = db.fetchone(
-                'SELECT name, is_archived FROM activities WHERE id = %s',
-                (view.activity_id,),
-            )
-            view.selected_activity = row['name'] if row else ''
-            view.activity_is_archived = bool(row['is_archived']) if row else False
+        row = Activity.get(view.activity_id)
+        view.selected_activity = row['name'] if row else ''
+        view.activity_is_archived = bool(row['is_archived']) if row else False
 
         acts = view._fetch_activities(view.selected_category)
         new_act = ActivityNameSelect(acts, current_id=view.activity_id)
@@ -401,12 +368,8 @@ class ArchiveButton(discord.ui.Button):
             )
             return
 
-        with DBManager() as db:
-            new_flag = not v.activity_is_archived
-            db.execute(
-                'UPDATE activities SET is_archived = %s WHERE id = %s',
-                (new_flag, v.activity_id),
-            )
+        new_flag = not v.activity_is_archived
+        Activity.set_archived(v.activity_id, new_flag)
 
         v.activity_is_archived = new_flag
         self.label = 'Unarchive' if v.activity_is_archived else 'Archive'
@@ -447,11 +410,7 @@ class ContinueEditButton(discord.ui.Button):
             )
             return
 
-        with DBManager() as db:
-            row = db.fetchone(
-                'SELECT name, xp_value FROM activities WHERE id = %s',
-                (v.activity_id,),
-            )
+        row = Activity.get(v.activity_id)
         if not row:
             await interaction.response.send_message(
                 'Selected activity not found.', ephemeral=True

@@ -5,7 +5,9 @@ from discord import Interaction, app_commands
 from discord.ext import commands
 
 from src.components.activity_records import RecentRecordsView
-from src.database.db_manager import DBManager
+from src.models.activity import Activity
+from src.models.activity_record import ActivityRecord
+from src.models.user import User
 
 
 class ActivityRecordsCog(commands.Cog):
@@ -15,21 +17,11 @@ class ActivityRecordsCog(commands.Cog):
     # --- Autocomplete for category ---
     async def category_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete available categories from the DB.'''
-        with DBManager() as db:
-            categories = db.fetchall(
-                '''
-                SELECT DISTINCT category
-                FROM activities
-                WHERE category LIKE %s AND is_archived = FALSE
-                ORDER BY category ASC
-                LIMIT 25
-                ''',
-                (f'%{current}%',),
-            )
-            return [
-                app_commands.Choice(name=row['category'], value=row['category'])
-                for row in categories
-            ]
+        # Filter client-side after fetching limited categories
+        categories = Activity.list_categories(active_only=True)
+        cur = (current or '').lower()
+        filtered = [c for c in categories if cur in c.lower()]
+        return [app_commands.Choice(name=c, value=c) for c in filtered]
 
     # --- Autocomplete for activity based on selected category ---
     async def activity_autocomplete(self, interaction: Interaction, current: str):
@@ -38,22 +30,12 @@ class ActivityRecordsCog(commands.Cog):
         category = interaction.namespace.category
         if not category:
             return []  # No category selected yet
-
-        with DBManager() as db:
-            activities = db.fetchall(
-                '''
-                SELECT name
-                FROM activities
-                WHERE category = %s AND name LIKE %s AND is_archived = FALSE
-                ORDER BY name ASC
-                LIMIT 25
-                ''',
-                (category, f'%{current}%'),
-            )
-            return [
-                app_commands.Choice(name=row['name'], value=row['name'])
-                for row in activities
-            ]
+        names = [
+            a['name'] for a in Activity.list_by_category(category, active_only=True)
+        ]
+        cur = (current or '').lower()
+        filtered = [n for n in names if cur in n.lower()]
+        return [app_commands.Choice(name=n, value=n) for n in filtered]
 
     # --- Command: /record ---
     @app_commands.command(name='record', description='Record an activity to earn XP')
@@ -87,75 +69,53 @@ class ActivityRecordsCog(commands.Cog):
             )
             return
 
+        # Ensure user exists
+        User.upsert_user(user_id, display_name)
         # Optionally convert back to string to normalize
         date_value = date_obj.isoformat()
 
-        with DBManager() as db:
-            # --- Ensure user exists ---
-            db.execute(
-                '''
-                INSERT INTO users (id, display_name)
-                VALUES (%s, %s)
-                ON CONFLICT(id) DO UPDATE SET display_name=excluded.display_name
-                ''',
-                (user_id, display_name),
+        # --- Daily bonus check (first record today) ---
+        check_bonus = False
+        today_str = datetime.now(timezone.utc).date().isoformat()
+        if date_value == today_str:
+            check_bonus = not ActivityRecord.has_record_on_date(user_id, today_str)
+
+        # --- Lookup activity ---
+        activity_row = Activity.get_by_name_category(
+            activity, category, active_only=True
+        )
+
+        if not activity_row:
+            await interaction.response.send_message(
+                f'❌ Activity "{activity}" not found in category "{category}".',
+                ephemeral=True,
             )
+            return
 
-            # --- Daily bonus check (first record today) ---
-            check_bonus = False
-            today_str = datetime.now(timezone.utc).date().isoformat()
-            if date_value == today_str:
-                already_row = db.fetchone(
-                    'SELECT 1 FROM activity_records '
-                    'WHERE user_id = %s AND date_occurred = %s LIMIT 1',
-                    (user_id, today_str),
-                )
-                check_bonus = already_row is None
+        activity_id = activity_row['id']
 
-            # --- Lookup activity ---
-            activity_row = db.fetchone(
-                'SELECT id, xp_value FROM activities '
-                'WHERE name = %s AND category = %s AND is_archived = FALSE',
-                (activity, category),
-            )
+        # --- Record the activity ---
+        ActivityRecord.insert(
+            user_id=user_id,
+            activity_id=activity_id,
+            note=note,
+            date_occurred=date_value,
+        )
 
-            if not activity_row:
-                await interaction.response.send_message(
-                    f'❌ Activity "{activity}" not found in category "{category}".',
-                    ephemeral=True,
-                )
-                return
+        # XP is handled automatically by trigger
+        message = f"✅ Recorded: **{activity}** (+{activity_row['xp_value']} XP)"
+        message += f'\n📂 Category: {category}'
+        if note:
+            message += f'\n📝 _{note}_'
+        if date_occurred:
+            message += f'\n📅 Date: {date_value}'
 
-            activity_id = activity_row['id']
+        # --- Apply daily bonus after successful record ---
+        if check_bonus:
+            User.add_daily_bonus(user_id)
+            message += '\n🎁 Daily bonus: +10 XP'
 
-            # --- Record the activity ---
-            db.execute(
-                '''
-                INSERT INTO activity_records (user_id, activity_id, note, date_occurred)
-                VALUES (%s, %s, %s, %s)
-                ''',
-                (user_id, activity_id, note, date_value),
-            )
-
-            # XP is handled automatically by trigger
-            message = f"✅ Recorded: **{activity}** (+{activity_row['xp_value']} XP)"
-            message += f'\n📂 Category: {category}'
-            if note:
-                message += f'\n📝 _{note}_'
-            if date_occurred:
-                message += f'\n📅 Date: {date_value}'
-
-            # --- Apply daily bonus after successful record ---
-            if check_bonus:
-                db.execute(
-                    'UPDATE users '
-                    'SET total_xp = total_xp + 10, updated_at = CURRENT_TIMESTAMP '
-                    'WHERE id = %s',
-                    (user_id,),
-                )
-                message += '\n🎁 Daily bonus: +10 XP'
-
-            await interaction.response.send_message(message)
+        await interaction.response.send_message(message)
 
     @app_commands.command(
         name='recent', description='View and edit your recent activity records'
@@ -181,33 +141,9 @@ class ActivityRecordsCog(commands.Cog):
         user_id = interaction.user.id
         lim = max(1, min(50, limit or 5))
         sort_mode = (sort_by.value if sort_by else 'occurred').lower()
-
-        if sort_mode == 'created':
-            order_clause = 'ORDER BY ar.created_at DESC, ar.id DESC'
-        elif sort_mode == 'updated':
-            order_clause = 'ORDER BY ar.updated_at DESC, ar.id DESC'
-        else:  # Default: occurred
-            order_clause = 'ORDER BY ar.date_occurred DESC, ar.id DESC'
-
-        with DBManager() as db:
-            rows = db.fetchall(
-                f'''
-                SELECT ar.id AS id,
-                       ar.note AS note,
-                       ar.date_occurred AS date_occurred,
-                       ar.created_at AS created_at,
-                       ar.updated_at AS updated_at,
-                       a.name AS activity_name,
-                       a.category AS category,
-                       a.xp_value AS xp_value
-                FROM activity_records ar
-                JOIN activities a ON a.id = ar.activity_id
-                WHERE ar.user_id = %s AND a.is_archived = FALSE
-                {order_clause}
-                LIMIT %s
-                ''',
-                (user_id, lim),
-            )
+        rows = ActivityRecord.recent_for_user(
+            user_id=user_id, limit=lim, sort=sort_mode  # type: ignore[arg-type]
+        )
 
         if not rows:
             await interaction.response.send_message(

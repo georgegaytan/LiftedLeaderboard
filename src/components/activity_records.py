@@ -1,11 +1,81 @@
-from __future__ import annotations
-
 from datetime import date
 
 import discord
 from discord import Interaction
 
-from src.database.db_manager import DBManager
+from src.models.activity import Activity
+from src.models.activity_record import ActivityRecord
+
+
+class RecentRecordsView(discord.ui.View):
+    def __init__(self, requestor_id: int, records: list[dict]):
+        super().__init__(timeout=120)
+        self.requestor_id = requestor_id
+        self.records = records
+
+        options = []
+        for idx, r in enumerate(records, start=1):
+            label = f"{idx}. {r['activity_name']}"
+            # Coerce date to ISO string for Discord component JSON
+            d = r['date_occurred']
+            d_str = d.isoformat() if isinstance(d, date) else str(d)
+            description = f"{r['category']} • {d_str}"
+            options.append(
+                discord.SelectOption(
+                    label=label, description=description, value=str(r['id'])
+                )
+            )
+
+        self.add_item(_RecordSelect(options))
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        if interaction.user.id != self.requestor_id:
+            await interaction.response.send_message(
+                'You cannot interact with this view.', ephemeral=True
+            )
+            return False
+        return True
+
+
+class RecordEditView(discord.ui.View):
+    def __init__(self, record: dict, requestor_id: int):
+        super().__init__(timeout=180)
+        self.record = record
+        self.requestor_id = requestor_id
+        self.selected_category: str = record['category']
+        self.selected_activity: str = record['activity_name']
+        self.current_note: str | None = record['note']
+        # Ensure current_date is a string (Postgres DATE may come as date object)
+        d = record['date_occurred']
+        self.current_date: str = d.isoformat() if isinstance(d, date) else str(d)
+
+        categories = self._fetch_categories()
+        activities = self._fetch_activities(self.selected_category)
+
+        self.category_select = CategorySelect(categories, self.selected_category)
+        self.activity_select = ActivitySelect(activities, self.selected_activity)
+
+        self.add_item(self.category_select)
+        self.add_item(self.activity_select)
+        self.add_item(DeleteButton(self))
+        self.add_item(ContinueButton(self))
+
+    async def interaction_check(self, interaction: Interaction) -> bool:
+        if interaction.user.id != self.requestor_id:
+            await interaction.response.send_message(
+                'You cannot interact with this view.', ephemeral=True
+            )
+            return False
+        return True
+
+    def _fetch_categories(self) -> list[str]:
+        return Activity.list_categories(active_only=True, limit=25)
+
+    def _fetch_activities(self, category: str) -> list[str]:
+        if not category:
+            return []
+        rows = Activity.list_by_category(category, active_only=True, limit=25)
+        return [r['name'] for r in rows]
 
 
 class RecordEditModal(discord.ui.Modal):
@@ -56,20 +126,12 @@ class RecordEditModal(discord.ui.Modal):
             )
             return
 
-        with DBManager() as db:
-            db.execute(
-                '''
-                UPDATE activity_records
-                SET activity_id = %s, note = %s, date_occurred = %s
-                WHERE id = %s
-                ''',
-                (
-                    self.staged_activity_id,
-                    note_val if note_val != '' else None,
-                    date_val,
-                    self.record_id,
-                ),
-            )
+        ActivityRecord.update_record(
+            record_id=self.record_id,
+            activity_id=self.staged_activity_id,
+            note=(note_val if note_val != '' else None),
+            date_occurred=date_val,
+        )
 
         await interaction.response.send_message(
             f'✅ Updated record: {self.staged_activity_name} ({self.staged_category}) '
@@ -98,42 +160,11 @@ class DeleteConfirmModal(discord.ui.Modal):
             )
             return
 
-        with DBManager() as db:
-            db.execute('DELETE FROM activity_records WHERE id = %s', (self.record_id,))
+        ActivityRecord.delete_record(self.record_id)
 
         await interaction.response.send_message(
             '✅ Record deleted successfully!', ephemeral=True
         )
-
-
-class RecentRecordsView(discord.ui.View):
-    def __init__(self, requestor_id: int, records: list[dict]):
-        super().__init__(timeout=120)
-        self.requestor_id = requestor_id
-        self.records = records
-
-        options = []
-        for idx, r in enumerate(records, start=1):
-            label = f"{idx}. {r['activity_name']}"
-            # Coerce date to ISO string for Discord component JSON
-            d = r['date_occurred']
-            d_str = d.isoformat() if isinstance(d, date) else str(d)
-            description = f"{r['category']} • {d_str}"
-            options.append(
-                discord.SelectOption(
-                    label=label, description=description, value=str(r['id'])
-                )
-            )
-
-        self.add_item(_RecordSelect(options))
-
-    async def interaction_check(self, interaction: Interaction) -> bool:
-        if interaction.user.id != self.requestor_id:
-            await interaction.response.send_message(
-                'You cannot interact with this view.', ephemeral=True
-            )
-            return False
-        return True
 
 
 class _RecordSelect(discord.ui.Select):
@@ -167,67 +198,6 @@ class _RecordSelect(discord.ui.Select):
 
         edit_view = RecordEditView(record=rec, requestor_id=view.requestor_id)
         await interaction.response.edit_message(view=edit_view)
-
-
-class RecordEditView(discord.ui.View):
-    def __init__(self, record: dict, requestor_id: int):
-        super().__init__(timeout=180)
-        self.record = record
-        self.requestor_id = requestor_id
-        self.selected_category: str = record['category']
-        self.selected_activity: str = record['activity_name']
-        self.current_note: str | None = record['note']
-        # Ensure current_date is a string (Postgres DATE may come as date object)
-        d = record['date_occurred']
-        self.current_date: str = d.isoformat() if isinstance(d, date) else str(d)
-
-        categories = self._fetch_categories()
-        activities = self._fetch_activities(self.selected_category)
-
-        self.category_select = CategorySelect(categories, self.selected_category)
-        self.activity_select = ActivitySelect(activities, self.selected_activity)
-
-        self.add_item(self.category_select)
-        self.add_item(self.activity_select)
-        self.add_item(DeleteButton(self))
-        self.add_item(ContinueButton(self))
-
-    async def interaction_check(self, interaction: Interaction) -> bool:
-        if interaction.user.id != self.requestor_id:
-            await interaction.response.send_message(
-                'You cannot interact with this view.', ephemeral=True
-            )
-            return False
-        return True
-
-    def _fetch_categories(self) -> list[str]:
-        with DBManager() as db:
-            rows = db.fetchall(
-                '''
-                SELECT DISTINCT category
-                FROM activities
-                WHERE is_archived = FALSE
-                ORDER BY category ASC
-                LIMIT 25
-                '''
-            )
-        return [r['category'] for r in rows]
-
-    def _fetch_activities(self, category: str) -> list[str]:
-        if not category:
-            return []
-        with DBManager() as db:
-            rows = db.fetchall(
-                '''
-                SELECT name
-                FROM activities
-                WHERE category = %s AND is_archived = FALSE
-                ORDER BY name ASC
-                LIMIT 25
-                ''',
-                (category,),
-            )
-        return [r['name'] for r in rows]
 
 
 class CategorySelect(discord.ui.Select):
@@ -323,15 +293,7 @@ class ContinueButton(discord.ui.Button):
             )
             return
 
-        with DBManager() as db:
-            row = db.fetchone(
-                '''
-                SELECT id
-                FROM activities
-                WHERE category = %s AND name = %s AND is_archived = FALSE
-                ''',
-                (category, activity_name),
-            )
+        row = Activity.get_by_name_category(activity_name, category, active_only=True)
 
         if not row:
             await interaction.response.send_message(
