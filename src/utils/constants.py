@@ -1,5 +1,7 @@
 TIMESTAMP_FORMAT = '%Y-%m-%d %H:%M:%S'  # For SQLite TIMESTAMP
 
+DAILY_BONUS_XP = 10
+
 HEALTH_FACTS = [
     'Walking after meals may not fix your metabolism, but it will remind you that time is fleeting.',  # noqa: E501
     'Drinking water is a great way to make piss.',  # noqa: E501

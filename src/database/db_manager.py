@@ -30,10 +30,11 @@ def require_connection(func: Callable) -> Callable:
 class DBManager:
     '''Postgres DB manager'''
 
-    def __init__(self):
+    def __init__(self) -> None:
         self.engine: str = 'postgres'
-        self._connected = False
-        self._pg_conn = None
+        self._connected: bool = False
+        # Any to avoid importing psycopg types at type-check time; guarded by asserts
+        self._pg_conn: Any | None = None
 
     def __enter__(self) -> 'DBManager':
         db_url = os.getenv('DATABASE_URL')
@@ -65,6 +66,7 @@ class DBManager:
 
     def _exec_pg(self, query: str, params: Iterable[Any] | None) -> None:
         '''Execute a statement that does not return rows (INSERT, UPDATE, DELETE).'''
+        assert self._pg_conn is not None
         with self._pg_conn.cursor() as cur:
             cur.execute(query, tuple(params or ()))
 
@@ -72,6 +74,7 @@ class DBManager:
         self, query: str, params: Iterable[Any] | None
     ) -> Tuple[List[dict[str, Any]], List[str]]:
         '''Execute a SELECT query and return (rows, column_names).'''
+        assert self._pg_conn is not None
         with self._pg_conn.cursor() as cur:
             cur.execute(query, tuple(params or ()))
             rows: List[dict[str, Any]] = cur.fetchall()
@@ -95,6 +98,7 @@ class DBManager:
     def executemany(self, query: str, param_list: Iterable[Sequence[Any]]) -> None:
         '''Execute a SQL statement against a sequence of parameter sets.'''
         try:
+            assert self._pg_conn is not None
             with self._pg_conn.cursor() as cur:
                 cur.executemany(query, list(param_list))
         except Exception as e:
