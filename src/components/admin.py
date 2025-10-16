@@ -4,145 +4,10 @@ from discord import Interaction
 from src.models.activity import Activity
 
 
-class CategorySelect(discord.ui.Select):
-    '''Dropdown to select an existing category from the DB.'''
-
-    def __init__(self, categories: list[str]):
-        options = [discord.SelectOption(label=cat) for cat in categories]
-        super().__init__(
-            placeholder='Select a category...',
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
-
-    async def callback(self, interaction: Interaction):
-        selected_category = self.values[0]
-        await interaction.response.send_modal(AddActivityModal(selected_category))
-
-
-class AddActivityModal(discord.ui.Modal):
-    '''Modal to input activity name and XP value.'''
-
-    activity_name = discord.ui.TextInput(
-        label='Activity Name',
-        placeholder='i.e. Hiking for N hours, Meditation, etc.',
-        required=True,
-        max_length=100,
-    )
-
-    xp_value = discord.ui.TextInput(
-        label='XP Value',
-        placeholder='Enter a positive integer (i.e. 50)',
-        required=True,
-        style=discord.TextStyle.short,
-    )
-
-    def __init__(self, category: str):
-        super().__init__(title='Add New Activity')
-        self.category = category
-
-    async def on_submit(self, interaction: Interaction):
-        name = str(self.activity_name.value).strip()
-        xp_str = str(self.xp_value.value).strip()
-
-        try:
-            xp_value = int(xp_str)
-            assert xp_value > 0
-        except ValueError:
-            await interaction.response.send_message(
-                f'❌ Invalid XP value: `{xp_str}`. Please enter a positive integer.',
-                ephemeral=True,
-            )
-            return
-
-        Activity.upsert_activity(name=name, category=self.category, xp_value=xp_value)
-
-        await interaction.response.send_message(
-            f'✅ Activity **{name}** (Category: **{self.category}**) '
-            f'added with **{xp_value} XP**!',
-            ephemeral=True,
-        )
-
-
 class CategorySelectView(discord.ui.View):
-    '''View that displays the category dropdown.'''
-
     def __init__(self, categories: list[str]):
         super().__init__(timeout=60)
         self.add_item(CategorySelect(categories))
-
-
-class ActivityEditModal(discord.ui.Modal):
-    def __init__(
-        self,
-        activity_id: int,
-        current_name: str,
-        current_xp: int,
-        staged_new_category: str | None,
-    ):
-        super().__init__(title='Edit Activity')
-        self.activity_id = activity_id
-        self.staged_new_category = staged_new_category
-
-        self.activity_name = discord.ui.TextInput(
-            label='Activity Name',
-            placeholder='Enter new name…',
-            required=True,
-            max_length=100,
-            default=current_name,
-        )
-        self.xp_value = discord.ui.TextInput(
-            label='XP Value',
-            placeholder='Enter a positive integer (i.e. 50)',
-            required=True,
-            style=discord.TextStyle.short,
-            default=str(current_xp),
-        )
-
-        self.add_item(self.activity_name)
-        self.add_item(self.xp_value)
-
-    async def on_submit(self, interaction: Interaction):
-        name = str(self.activity_name.value).strip()
-        xp_str = str(self.xp_value.value).strip()
-
-        try:
-            xp_val = int(xp_str)
-            assert xp_val > 0
-        except Exception:
-            await interaction.response.send_message(
-                f'❌ Invalid XP value: `{xp_str}`. Please enter a positive integer.',
-                ephemeral=True,
-            )
-            return
-
-        try:
-            row = Activity.get(self.activity_id)
-            current_category = row['category'] if row else None
-            final_category = (
-                self.staged_new_category
-                if self.staged_new_category
-                else current_category
-            )
-            Activity.update(
-                self.activity_id,
-                {
-                    'name': name,
-                    'xp_value': xp_val,
-                    'category': final_category,
-                },
-            )
-        except Exception as e:
-            await interaction.response.send_message(
-                f'❌ Failed to update activity: {e}', ephemeral=True
-            )
-            return
-
-        await interaction.response.send_message(
-            f'✅ Activity updated to **{name}** with **{xp_val} XP**.',
-            ephemeral=True,
-        )
 
 
 class ActivityEditView(discord.ui.View):
@@ -209,6 +74,21 @@ class ActivityEditView(discord.ui.View):
             category, active_only=False, limit=25
         )
         return rows
+
+
+class CategorySelect(discord.ui.Select):
+    def __init__(self, categories: list[str]):
+        options = [discord.SelectOption(label=cat) for cat in categories]
+        super().__init__(
+            placeholder='Select a category...',
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: Interaction):
+        selected_category = self.values[0]
+        await interaction.response.send_modal(AddActivityModal(selected_category))
 
 
 class ActivityCategorySelect(discord.ui.Select):
@@ -342,6 +222,120 @@ class NewCategorySelect(discord.ui.Select):
 
     async def callback(self, interaction: Interaction):
         await interaction.response.defer()
+
+
+class AddActivityModal(discord.ui.Modal):
+    activity_name = discord.ui.TextInput(
+        label='Activity Name',
+        placeholder='i.e. Hiking for N hours, Meditation, etc.',
+        required=True,
+        max_length=100,
+    )
+
+    xp_value = discord.ui.TextInput(
+        label='XP Value',
+        placeholder='Enter a positive integer (i.e. 50)',
+        required=True,
+        style=discord.TextStyle.short,
+    )
+
+    def __init__(self, category: str):
+        super().__init__(title='Add New Activity')
+        self.category = category
+
+    async def on_submit(self, interaction: Interaction):
+        name = str(self.activity_name.value).strip()
+        xp_str = str(self.xp_value.value).strip()
+
+        try:
+            xp_value = int(xp_str)
+            assert xp_value > 0
+        except ValueError:
+            await interaction.response.send_message(
+                f'❌ Invalid XP value: `{xp_str}`. Please enter a positive integer.',
+                ephemeral=True,
+            )
+            return
+
+        Activity.upsert_activity(name=name, category=self.category, xp_value=xp_value)
+
+        await interaction.response.send_message(
+            f'✅ Activity **{name}** (Category: **{self.category}**) '
+            f'added with **{xp_value} XP**!',
+            ephemeral=True,
+        )
+
+
+class ActivityEditModal(discord.ui.Modal):
+    def __init__(
+        self,
+        activity_id: int,
+        current_name: str,
+        current_xp: int,
+        staged_new_category: str | None,
+    ):
+        super().__init__(title='Edit Activity')
+        self.activity_id = activity_id
+        self.staged_new_category = staged_new_category
+
+        self.activity_name = discord.ui.TextInput(
+            label='Activity Name',
+            placeholder='Enter new name…',
+            required=True,
+            max_length=100,
+            default=current_name,
+        )
+        self.xp_value = discord.ui.TextInput(
+            label='XP Value',
+            placeholder='Enter a positive integer (i.e. 50)',
+            required=True,
+            style=discord.TextStyle.short,
+            default=str(current_xp),
+        )
+
+        self.add_item(self.activity_name)
+        self.add_item(self.xp_value)
+
+    async def on_submit(self, interaction: Interaction):
+        name = str(self.activity_name.value).strip()
+        xp_str = str(self.xp_value.value).strip()
+
+        try:
+            xp_val = int(xp_str)
+            assert xp_val > 0
+        except Exception:
+            await interaction.response.send_message(
+                f'❌ Invalid XP value: `{xp_str}`. Please enter a positive integer.',
+                ephemeral=True,
+            )
+            return
+
+        try:
+            row = Activity.get(self.activity_id)
+            current_category = row['category'] if row else None
+            final_category = (
+                self.staged_new_category
+                if self.staged_new_category
+                else current_category
+            )
+            Activity.update(
+                self.activity_id,
+                {
+                    'name': name,
+                    'xp_value': xp_val,
+                    'category': final_category,
+                },
+            )
+        except Exception as e:
+            await interaction.response.send_message(
+                f'❌ Failed to update activity: {e}', ephemeral=True
+            )
+            return
+
+        await interaction.response.send_message(
+            f'✅ Activity updated to **{name}** with **{xp_val} XP**.',
+            ephemeral=True,
+        )
 
 
 class ArchiveButton(discord.ui.Button):

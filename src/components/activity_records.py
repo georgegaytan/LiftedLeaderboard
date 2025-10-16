@@ -78,6 +78,93 @@ class RecordEditView(discord.ui.View):
         return [r['name'] for r in rows]
 
 
+class _RecordSelect(discord.ui.Select):
+    def __init__(self, options: list[discord.SelectOption]):
+        super().__init__(
+            placeholder='Select a record to edit…',
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: Interaction):
+        view = self.view
+        if not isinstance(view, RecentRecordsView):
+            await interaction.response.send_message(
+                'Internal error: invalid view.', ephemeral=True
+            )
+            return
+
+        if not self.values:
+            await interaction.response.send_message(
+                'No record selected.', ephemeral=True
+            )
+            return
+
+        record_id = int(self.values[0])
+        rec = next((r for r in view.records if r['id'] == record_id), None)
+        if not rec:
+            await interaction.response.send_message('Record not found.', ephemeral=True)
+            return
+
+        edit_view = RecordEditView(record=rec, requestor_id=view.requestor_id)
+        await interaction.response.edit_message(view=edit_view)
+
+
+class CategorySelect(discord.ui.Select):
+    def __init__(self, categories: list[str], current: str):
+        options = [
+            discord.SelectOption(label=c, value=c, default=(c == current))
+            for c in categories
+        ]
+        super().__init__(
+            placeholder='Select category…', min_values=1, max_values=1, options=options
+        )
+
+    async def callback(self, interaction: Interaction):
+        v = self.view
+        if not isinstance(v, RecordEditView):
+            await interaction.response.send_message(
+                'Internal error: invalid view.', ephemeral=True
+            )
+            return
+        v.selected_category = self.values[0]
+        v.category_select.options = [
+            discord.SelectOption(
+                label=c.label, value=c.value, default=(c.value == v.selected_category)
+            )
+            for c in self.options
+        ]
+        activities = v._fetch_activities(v.selected_category)
+        v.selected_activity = activities[0] if activities else ''
+        v.activity_select.options = [
+            discord.SelectOption(label=a, value=a, default=(a == v.selected_activity))
+            for a in activities
+        ]
+        await interaction.response.edit_message(view=v)
+
+
+class ActivitySelect(discord.ui.Select):
+    def __init__(self, activities: list[str], current: str):
+        options = [
+            discord.SelectOption(label=a, value=a, default=(a == current))
+            for a in activities
+        ]
+        super().__init__(
+            placeholder='Select activity…', min_values=1, max_values=1, options=options
+        )
+
+    async def callback(self, interaction: Interaction):
+        v = self.view
+        if not isinstance(v, RecordEditView):
+            await interaction.response.send_message(
+                'Internal error: invalid view.', ephemeral=True
+            )
+            return
+        v.selected_activity = self.values[0]
+        await interaction.response.defer()
+
+
 class RecordEditModal(discord.ui.Modal):
     def __init__(
         self,
@@ -165,93 +252,6 @@ class DeleteConfirmModal(discord.ui.Modal):
         await interaction.response.send_message(
             '✅ Record deleted successfully!', ephemeral=True
         )
-
-
-class _RecordSelect(discord.ui.Select):
-    def __init__(self, options: list[discord.SelectOption]):
-        super().__init__(
-            placeholder='Select a record to edit…',
-            min_values=1,
-            max_values=1,
-            options=options,
-        )
-
-    async def callback(self, interaction: Interaction):
-        view = self.view
-        if not isinstance(view, RecentRecordsView):
-            await interaction.response.send_message(
-                'Internal error: invalid view.', ephemeral=True
-            )
-            return
-
-        if not self.values:
-            await interaction.response.send_message(
-                'No record selected.', ephemeral=True
-            )
-            return
-
-        record_id = int(self.values[0])
-        rec = next((r for r in view.records if r['id'] == record_id), None)
-        if not rec:
-            await interaction.response.send_message('Record not found.', ephemeral=True)
-            return
-
-        edit_view = RecordEditView(record=rec, requestor_id=view.requestor_id)
-        await interaction.response.edit_message(view=edit_view)
-
-
-class CategorySelect(discord.ui.Select):
-    def __init__(self, categories: list[str], current: str):
-        options = [
-            discord.SelectOption(label=c, value=c, default=(c == current))
-            for c in categories
-        ]
-        super().__init__(
-            placeholder='Select category…', min_values=1, max_values=1, options=options
-        )
-
-    async def callback(self, interaction: Interaction):
-        v = self.view
-        if not isinstance(v, RecordEditView):
-            await interaction.response.send_message(
-                'Internal error: invalid view.', ephemeral=True
-            )
-            return
-        v.selected_category = self.values[0]
-        v.category_select.options = [
-            discord.SelectOption(
-                label=c.label, value=c.value, default=(c.value == v.selected_category)
-            )
-            for c in self.options
-        ]
-        activities = v._fetch_activities(v.selected_category)
-        v.selected_activity = activities[0] if activities else ''
-        v.activity_select.options = [
-            discord.SelectOption(label=a, value=a, default=(a == v.selected_activity))
-            for a in activities
-        ]
-        await interaction.response.edit_message(view=v)
-
-
-class ActivitySelect(discord.ui.Select):
-    def __init__(self, activities: list[str], current: str):
-        options = [
-            discord.SelectOption(label=a, value=a, default=(a == current))
-            for a in activities
-        ]
-        super().__init__(
-            placeholder='Select activity…', min_values=1, max_values=1, options=options
-        )
-
-    async def callback(self, interaction: Interaction):
-        v = self.view
-        if not isinstance(v, RecordEditView):
-            await interaction.response.send_message(
-                'Internal error: invalid view.', ephemeral=True
-            )
-            return
-        v.selected_activity = self.values[0]
-        await interaction.response.defer()
 
 
 class DeleteButton(discord.ui.Button):
