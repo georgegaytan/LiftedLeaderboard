@@ -6,7 +6,6 @@ from src.database.db_manager import DBManager
 from src.utils.helper import level_to_rank
 
 
-# TODO: Add history command to give link to webapp with visuals for data
 class UserCog(commands.Cog):
     '''Cog for handling user registration and profile management.'''
 
