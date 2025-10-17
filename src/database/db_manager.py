@@ -12,6 +12,11 @@ except Exception:  # pragma: no cover
     psycopg = None  # type: ignore
     dict_row = None  # type: ignore
 
+try:
+    from psycopg_pool import ConnectionPool  # type: ignore
+except Exception:  # pragma: no cover
+    ConnectionPool = None  # type: ignore
+
 
 def require_connection(func: Callable) -> Callable:
     '''Decorator to ensure DBManager is used within a context manager.'''
@@ -35,19 +40,70 @@ class DBManager:
         self._connected: bool = False
         # Any to avoid importing psycopg types at type-check time; guarded by asserts
         self._pg_conn: Any | None = None
+        self._from_pool: bool = False
 
-    def __enter__(self) -> 'DBManager':
-        db_url = os.getenv('DATABASE_URL')
-        if not db_url:
-            raise RuntimeError(
-                'DATABASE_URL is not set. This project now requires Postgres.'
-            )
+    # Shared pool across the process
+    _pool: Any | None = None
+
+    @classmethod
+    def init_pool(
+        cls,
+        db_url: Optional[str] = None,
+        min_size: int = 1,
+        max_size: int = 10,
+    ) -> None:
+        '''Initialize a global connection pool for reuse across requests.'''
+        if cls._pool is not None:
+            return
         if psycopg is None:
             raise RuntimeError(
                 'psycopg is not installed. Run: pip install "psycopg[binary,pool]"'
             )
-        # autocommit off to mimic transaction behavior
-        self._pg_conn = psycopg.connect(db_url, row_factory=dict_row)
+        if ConnectionPool is None:
+            raise RuntimeError(
+                'psycopg_pool is not available. Run: pip install "psycopg[binary,pool]"'
+            )
+
+        conninfo = db_url or os.getenv('DATABASE_URL')
+        if not conninfo:
+            raise RuntimeError(
+                'DATABASE_URL is not set. This project now requires Postgres.'
+            )
+        # Ensure row_factory is applied to connections from the pool
+        cls._pool = ConnectionPool(
+            conninfo=conninfo,
+            min_size=min_size,
+            max_size=max_size,
+            kwargs={'row_factory': dict_row},
+        )
+        logger.info('Initialized Postgres connection pool')
+
+    @classmethod
+    def close_pool(cls) -> None:
+        '''Close the global connection pool if it exists.'''
+        if cls._pool is not None:
+            try:
+                cls._pool.close()
+            finally:
+                cls._pool = None
+
+    def __enter__(self) -> 'DBManager':
+        db_url = os.getenv('DATABASE_URL')
+        if psycopg is None:
+            raise RuntimeError(
+                'psycopg is not installed. Run: pip install "psycopg[binary,pool]"'
+            )
+        if self.__class__._pool is not None:
+            # Acquire from pool
+            self._pg_conn = self.__class__._pool.getconn()
+            self._from_pool = True
+        else:
+            if not db_url:
+                raise RuntimeError(
+                    'DATABASE_URL is not set. This project now requires Postgres.'
+                )
+            # autocommit off to mimic transaction behavior
+            self._pg_conn = psycopg.connect(db_url, row_factory=dict_row)
         self._connected = True
         return self
 
@@ -60,8 +116,15 @@ class DBManager:
             else:
                 self._pg_conn.rollback()
         finally:
-            self._pg_conn.close()
-            self._pg_conn = None
+            if self._from_pool and self.__class__._pool is not None:
+                try:
+                    self.__class__._pool.putconn(self._pg_conn)
+                finally:
+                    self._pg_conn = None
+                    self._from_pool = False
+            else:
+                self._pg_conn.close()
+                self._pg_conn = None
         self._connected = False
 
     def _exec_pg(self, query: str, params: Iterable[Any] | None) -> None:

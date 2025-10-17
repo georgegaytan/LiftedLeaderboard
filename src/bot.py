@@ -6,6 +6,7 @@ import pathlib
 import discord
 from discord.ext import commands
 
+from src.database.db_manager import DBManager
 from src.utils.env import load_env
 
 # --- Logging setup ---
@@ -54,12 +55,18 @@ async def main():
     if not token:
         raise RuntimeError('DISCORD_TOKEN not set in environment or .env')
 
+    # Initialize the Postgres connection pool once for the process
+    DBManager.init_pool()
+
     bot = LiftedLeaderboardBot()
     try:
         async with bot:
             await bot.start(token)
     except Exception:
         logger.error('Bot failed due to an exception', exc_info=True)
+    finally:
+        # Ensure DB connections are cleaned up on shutdown
+        DBManager.close_pool()
 
 
 if __name__ == '__main__':

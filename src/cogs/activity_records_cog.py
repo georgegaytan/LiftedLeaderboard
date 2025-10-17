@@ -1,4 +1,6 @@
+import logging
 from datetime import date, datetime, timezone
+from time import perf_counter
 
 import discord
 from discord import Interaction, app_commands
@@ -8,6 +10,8 @@ from src.components.activity_records import RecentRecordsView
 from src.models.activity import Activity
 from src.models.activity_record import ActivityRecord
 from src.models.user import User
+
+logger = logging.getLogger(__name__)
 
 
 class ActivityRecordsCog(commands.Cog):
@@ -60,6 +64,7 @@ class ActivityRecordsCog(commands.Cog):
         user_id = interaction.user.id
         display_name = interaction.user.display_name
         date_value = date_occurred or date.today().isoformat()
+        t0 = perf_counter()
 
         try:
             date_obj = date.fromisoformat(date_value)
@@ -95,12 +100,16 @@ class ActivityRecordsCog(commands.Cog):
         activity_id = activity_row['id']
 
         # --- Record the activity ---
+        t_before_insert = perf_counter()
+        if not interaction.response.is_done():
+            await interaction.response.defer(thinking=True, ephemeral=True)
         ActivityRecord.insert(
             user_id=user_id,
             activity_id=activity_id,
             note=note,
             date_occurred=date_value,
         )
+        t_after_insert = perf_counter()
 
         # XP is handled automatically by trigger
         message = f"✅ Recorded: **{activity}** (+{activity_row['xp_value']} XP)"
@@ -115,7 +124,15 @@ class ActivityRecordsCog(commands.Cog):
             User.add_daily_bonus(user_id)
             message += '\n🎁 Daily bonus: +10 XP'
 
-        await interaction.response.send_message(message)
+        t_done = perf_counter()
+        logger.info(
+            f'/record timings: total={t_done - t0:.3f}s, '
+            f'before_insert={t_before_insert - t0:.3f}s, '
+            f'insert_block={t_after_insert - t_before_insert:.3f}s, '
+            f'daily_bonus={t_done - t_after_insert:.3f}s'
+        )
+
+        await interaction.followup.send(message)
 
     @app_commands.command(
         name='recent', description='View and edit your recent activity records'
