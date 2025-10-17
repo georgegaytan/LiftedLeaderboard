@@ -102,7 +102,7 @@ class ActivityRecordsCog(commands.Cog):
         # --- Record the activity ---
         t_before_insert = perf_counter()
         if not interaction.response.is_done():
-            await interaction.response.defer(thinking=True, ephemeral=True)
+            await interaction.response.defer(thinking=True)
         ActivityRecord.insert(
             user_id=user_id,
             activity_id=activity_id,
