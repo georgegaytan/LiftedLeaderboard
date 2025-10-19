@@ -24,6 +24,19 @@ class User(BaseModel):
             )
 
     @classmethod
+    def remove_daily_bonus(
+        cls, user_id: int | str, bonus: int = DAILY_BONUS_XP
+    ) -> None:
+        with DBManager() as db:
+            db.execute(
+                'UPDATE users '
+                'SET total_xp = '
+                'GREATEST(total_xp - %s, 0), updated_at = CURRENT_TIMESTAMP '
+                'WHERE id = %s',
+                (bonus, user_id),
+            )
+
+    @classmethod
     def get_profile(cls, user_id: int | str) -> Optional[dict[str, Any]]:
         with DBManager() as db:
             row = db.fetchone(

@@ -1,10 +1,11 @@
-from datetime import date
+from datetime import date, datetime, timezone
 
 import discord
 from discord import Interaction
 
 from src.models.activity import Activity
 from src.models.activity_record import ActivityRecord
+from src.models.user import User
 
 
 class RecentRecordsView(discord.ui.View):
@@ -246,6 +247,33 @@ class DeleteConfirmModal(discord.ui.Modal):
                 '❌ Confirmation failed. Record not deleted.', ephemeral=True
             )
             return
+
+        # Fetch record to inspect created_at and user_id
+        rec = ActivityRecord.get(self.record_id)
+        if not rec:
+            await interaction.response.send_message(
+                '❌ Record not found or already deleted.', ephemeral=True
+            )
+            return
+
+        user_id = rec.get('user_id')
+        created_at: datetime = rec.get('created_at')  # type: ignore[assignment]
+
+        # If this record is the only one created today for the user, remove daily bonus
+        try:
+            today_iso = datetime.now(timezone.utc).date().isoformat()
+            if hasattr(created_at, 'date'):
+                created_date_iso = created_at.date().isoformat()
+            else:
+                created_date_iso = str(created_at)[:10]
+
+            if created_date_iso == today_iso and user_id is not None:
+                cnt = ActivityRecord.count_on_created_date(user_id, today_iso)
+                if cnt == 1:
+                    User.remove_daily_bonus(user_id)
+        except Exception:
+            # Best-effort; proceed with deletion regardless
+            pass
 
         ActivityRecord.delete_record(self.record_id)
 

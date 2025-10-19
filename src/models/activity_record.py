@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Literal, cast
 
 from src.database.db_manager import DBManager
@@ -29,8 +30,8 @@ class ActivityRecord(BaseModel):
         with DBManager() as db:
             row = db.fetchone(
                 'SELECT 1 FROM activity_records '
-                'WHERE user_id = %s AND date_occurred = %s LIMIT 1',
-                (user_id, date_iso),
+                'WHERE user_id = %s AND created_at::date = %s LIMIT 1',
+                (user_id, date.fromisoformat(date_iso)),
             )
         return row is not None
 
@@ -59,6 +60,16 @@ class ActivityRecord(BaseModel):
         with DBManager() as db:
             rows = db.fetchall(sql, (user_id, limit))
         return cast(list[dict[str, Any]], rows)
+
+    @classmethod
+    def count_on_created_date(cls, user_id: int | str, date_iso: str) -> int:
+        with DBManager() as db:
+            row = db.fetchone(
+                'SELECT COUNT(*) AS cnt FROM activity_records '
+                'WHERE user_id = %s AND created_at::date = %s',
+                (user_id, date.fromisoformat(date_iso)),
+            )
+        return int(row['cnt']) if row and 'cnt' in row else 0
 
     @classmethod
     def update_record(
