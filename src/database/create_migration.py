@@ -21,16 +21,16 @@ def create_migration(name: str):
     filepath = os.path.join(MIGRATIONS_DIR, filename)
 
     # Template for new migration files
-    template = '''from src.services.db_manager import DBManager
+    template = '''from src.database.db_manager import DBManager
 
 
 def up(db_manager: DBManager):
-    """Apply this migration."""
+    \'\'\'Apply this migration.\'\'\'
     pass
 
 
 def down(db_manager: DBManager):
-    """Rollback this migration."""
+    \'\'\'Rollback this migration.\'\'\'
     pass
 '''
 
