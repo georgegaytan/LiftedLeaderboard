@@ -1,3 +1,4 @@
+from datetime import date
 from typing import Any, Literal, cast
 
 from src.database.db_manager import DBManager
@@ -29,8 +30,8 @@ class ActivityRecord(BaseModel):
         with DBManager() as db:
             row = db.fetchone(
                 'SELECT 1 FROM activity_records '
-                'WHERE user_id = %s AND date_occurred = %s LIMIT 1',
-                (user_id, date_iso),
+                'WHERE user_id = %s AND created_at::date = %s LIMIT 1',
+                (user_id, date.fromisoformat(date_iso)),
             )
         return row is not None
 
