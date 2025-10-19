@@ -21,18 +21,42 @@ def create_migration(name: str):
     filepath = os.path.join(MIGRATIONS_DIR, filename)
 
     # Template for new migration files
-    template = '''from src.database.db_manager import DBManager
-
-
-def up(db_manager: DBManager):
-    \'\'\'Apply this migration.\'\'\'
-    pass
-
-
-def down(db_manager: DBManager):
-    \'\'\'Rollback this migration.\'\'\'
-    pass
-'''
+    template = (
+        'from src.database.db_manager import DBManager\n'
+        'import argparse\n'
+        '\n'
+        '\n'
+        'def up(db_manager: DBManager):\n'
+        '    # Apply this migration.\n'
+        '    pass\n'
+        '\n'
+        '\n'
+        'def down(db_manager: DBManager):\n'
+        '    # Rollback this migration.\n'
+        '    db_manager.execute(\n'
+        '        \'DELETE FROM migrations\'\n'  # noqa: Q003
+        f'        \'WHERE filename = \'{filename}\'\'\n'  # noqa: Q003
+        '    )\n'
+        '\n'
+        '\n'
+        'def main():\n'
+        '    parser = argparse.ArgumentParser()\n'
+        '    parser.add_argument('
+        '        \'command\', choices=[\'up\', \'down\']'  # noqa: Q003
+        '    )\n'
+        '    args = parser.parse_args()\n'
+        '\n'
+        '    if args.command == \'up\':\n'  # noqa: Q003
+        '        with DBManager() as _db:\n'
+        '            up(_db)\n'
+        '    elif args.command == \'down\':\n'  # noqa: Q003
+        '        with DBManager() as _db:\n'
+        '            down(_db)\n'
+        '\n'
+        '\n'
+        'if __name__ == \'__main__\':\n'  # noqa: Q003
+        '    main()\n'
+    )
 
     with open(filepath, 'w', encoding='utf-8') as f:
         f.write(template)
