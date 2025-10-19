@@ -1,7 +1,9 @@
 import logging
 import os
 from functools import wraps
-from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple
+from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, TypeVar
+
+T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
 
@@ -127,6 +129,53 @@ class DBManager:
                 self._pg_conn = None
         self._connected = False
 
+    def _reconnect(self) -> None:
+        '''Close current connection and open a new one.'''
+        assert psycopg is not None
+
+        try:
+            if self._pg_conn is not None:
+                if self._from_pool and self.__class__._pool is not None:
+                    try:
+                        # if conn is broken, pool will discard on put
+                        self.__class__._pool.putconn(self._pg_conn)
+                    finally:
+                        self._pg_conn = None
+                        self._from_pool = False
+                else:
+                    try:
+                        self._pg_conn.close()
+                    finally:
+                        self._pg_conn = None
+                        self._from_pool = False
+        except Exception as e:  # best-effort close
+            logger.warning(f'Error while closing connection during reconnect: {e}')
+
+        # Open new connection
+        if self.__class__._pool is not None:
+            self._pg_conn = self.__class__._pool.getconn()
+            self._from_pool = True
+        else:
+            db_url = os.getenv('DATABASE_URL')
+            if not db_url:
+                raise RuntimeError(
+                    'DATABASE_URL is not set. This project now requires Postgres.'
+                )
+            self._pg_conn = psycopg.connect(db_url, row_factory=dict_row)
+
+    def _run_with_retry(self, fn: Callable[[], T]) -> T:
+        '''Run DB exec, reconn on OperationalError/InterfaceError, and retry once'''
+        assert psycopg is not None
+        try:
+            return fn()
+        except (psycopg.OperationalError, psycopg.InterfaceError) as e:
+            logger.warning(
+                f'DB operation failed due to connection issue: {e}. '
+                f'Reconnecting and retrying once...'
+            )
+            self._reconnect()
+            return fn()
+
     def _exec_pg(self, query: str, params: Iterable[Any] | None) -> None:
         '''Execute a statement that does not return rows (INSERT, UPDATE, DELETE).'''
         assert self._pg_conn is not None
@@ -150,7 +199,7 @@ class DBManager:
     def execute(self, query: str, params: Iterable[Any] | None = None) -> None:
         '''Execute a single SQL statement.'''
         try:
-            self._exec_pg(query, params)
+            self._run_with_retry(lambda: self._exec_pg(query, params))
         except Exception as e:
             logger.error(
                 f'Postgres execute() error: {e}\nQuery: {query}\nParams: {params}'
@@ -160,10 +209,14 @@ class DBManager:
     @require_connection
     def executemany(self, query: str, param_list: Iterable[Sequence[Any]]) -> None:
         '''Execute a SQL statement against a sequence of parameter sets.'''
-        try:
+
+        def _do() -> None:
             assert self._pg_conn is not None
             with self._pg_conn.cursor() as cur:
                 cur.executemany(query, list(param_list))
+
+        try:
+            self._run_with_retry(_do)
         except Exception as e:
             logger.error(f'Postgres executemany() error: {e}\nQuery: {query}')
             raise
@@ -173,7 +226,7 @@ class DBManager:
         self, query: str, params: Iterable[Any] | None = None
     ) -> List[dict[str, Any]]:
         '''Return all rows as a list of dictionaries.'''
-        rows, _ = self._select_pg(query, params)
+        rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
         return rows
 
     @require_connection
@@ -181,5 +234,5 @@ class DBManager:
         self, query: str, params: Iterable[Any] | None = None
     ) -> Optional[dict[str, Any]]:
         '''Return a single row as a dictionary, or None if no result.'''
-        rows, _ = self._select_pg(query, params)
+        rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
         return rows[0] if rows else None
