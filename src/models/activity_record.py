@@ -62,6 +62,16 @@ class ActivityRecord(BaseModel):
         return cast(list[dict[str, Any]], rows)
 
     @classmethod
+    def count_on_created_date(cls, user_id: int | str, date_iso: str) -> int:
+        with DBManager() as db:
+            row = db.fetchone(
+                'SELECT COUNT(*) AS cnt FROM activity_records '
+                'WHERE user_id = %s AND created_at::date = %s',
+                (user_id, date.fromisoformat(date_iso)),
+            )
+        return int(row['cnt']) if row and 'cnt' in row else 0
+
+    @classmethod
     def update_record(
         cls, record_id: int, activity_id: int, note: str | None, date_occurred: str
     ) -> dict[str, Any]:
