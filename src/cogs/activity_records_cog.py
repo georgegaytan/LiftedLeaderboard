@@ -10,6 +10,7 @@ from src.components.activity_records import RecentRecordsView
 from src.models.activity import Activity
 from src.models.activity_record import ActivityRecord
 from src.models.user import User
+from src.utils.helper import level_to_rank
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,11 @@ class ActivityRecordsCog(commands.Cog):
         # Optionally convert back to string to normalize
         date_value = date_obj.isoformat()
 
+        # --- Capture pre-change level and rank ---
+        before_profile = User.get_profile(user_id)
+        old_level = int(before_profile['level']) if before_profile else 1
+        old_rank = level_to_rank(old_level)
+
         # --- Daily bonus check (first record today) ---
         check_bonus = False
         today_str = datetime.now(timezone.utc).date().isoformat()
@@ -131,6 +137,16 @@ class ActivityRecordsCog(commands.Cog):
             f'insert_block={t_after_insert - t_before_insert:.3f}s, '
             f'daily_bonus={t_done - t_after_insert:.3f}s'
         )
+
+        # --- Capture post-change level and rank and append notifications ---
+        after_profile = User.get_profile(user_id)
+        if after_profile and 'level' in after_profile:
+            new_level = int(after_profile['level'])
+            new_rank = level_to_rank(new_level)
+            if new_level > old_level:
+                message += f'\n🎉 Level up! Level {old_level} → {new_level}'
+            if new_rank != old_rank:
+                message += f'\n🏅 Rank up! {old_rank} → {new_rank}'
 
         await interaction.followup.send(message)
 
