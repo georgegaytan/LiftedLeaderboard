@@ -1,4 +1,5 @@
 import logging
+import pathlib
 from datetime import date, datetime, timezone
 from time import perf_counter
 
@@ -19,7 +20,7 @@ class ActivityRecordsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # --- Autocomplete for category ---
+    # Autocomplete for category
     async def category_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete available categories from the DB.'''
         # Filter client-side after fetching limited categories
@@ -28,7 +29,7 @@ class ActivityRecordsCog(commands.Cog):
         filtered = [c for c in categories if cur in c.lower()]
         return [app_commands.Choice(name=c, value=c) for c in filtered]
 
-    # --- Autocomplete for activity based on selected category ---
+    # Autocomplete for activity based on selected category
     async def activity_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete activity names within the selected category.'''
         # Check what category the user has currently selected
@@ -42,7 +43,7 @@ class ActivityRecordsCog(commands.Cog):
         filtered = [n for n in names if cur in n.lower()]
         return [app_commands.Choice(name=n, value=n) for n in filtered]
 
-    # --- Command: /record ---
+    # Command: /record
     @app_commands.command(name='record', description='Record an activity to earn XP')
     @app_commands.describe(
         category='Choose the category of activity (e.g., Running, Swimming, etc.)',
@@ -80,18 +81,18 @@ class ActivityRecordsCog(commands.Cog):
         # Optionally convert back to string to normalize
         date_value = date_obj.isoformat()
 
-        # --- Capture pre-change level and rank ---
+        # Capture pre-change level and rank
         before_profile = User.get_profile(user_id)
         old_level = int(before_profile['level']) if before_profile else 1
         old_rank = level_to_rank(old_level)
 
-        # --- Daily bonus check (first record today) ---
+        # Daily bonus check (first record today)
         check_bonus = False
         today_str = datetime.now(timezone.utc).date().isoformat()
         if date_value == today_str:
             check_bonus = not ActivityRecord.has_record_on_date(user_id, today_str)
 
-        # --- Lookup activity ---
+        # Lookup activity
         activity_row = Activity.get_by_name_category(
             activity, category, active_only=True
         )
@@ -105,7 +106,7 @@ class ActivityRecordsCog(commands.Cog):
 
         activity_id = activity_row['id']
 
-        # --- Record the activity ---
+        # Record the activity
         t_before_insert = perf_counter()
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=True)
@@ -125,7 +126,7 @@ class ActivityRecordsCog(commands.Cog):
         if date_occurred:
             message += f'\n📅 Date: {date_value}'
 
-        # --- Apply daily bonus after successful record ---
+        # Apply daily bonus after successful record
         if check_bonus:
             User.add_daily_bonus(user_id)
             message += '\n🎁 Daily bonus: +10 XP'
@@ -138,17 +139,40 @@ class ActivityRecordsCog(commands.Cog):
             f'daily_bonus={t_done - t_after_insert:.3f}s'
         )
 
-        # --- Capture post-change level and rank and append notifications ---
+        # Capture post-change level and rank and append notifications
         after_profile = User.get_profile(user_id)
+        files: list[discord.File] = []
         if after_profile and 'level' in after_profile:
             new_level = int(after_profile['level'])
             new_rank = level_to_rank(new_level)
-            if new_level > old_level:
+            rank_changed = new_rank != old_rank
+            level_changed = new_level > old_level
+
+            if level_changed:
                 message += f'\n🎉 Level up! Level {old_level} → {new_level}'
-            if new_rank != old_rank:
+            if rank_changed:
                 message += f'\n🏅 Rank up! {old_rank} → {new_rank}'
 
-        await interaction.followup.send(message)
+            # Attach audio based on change
+            if rank_changed or level_changed:
+                base = pathlib.Path(__file__).resolve().parents[1]  # points to src/
+                audio_dir = base / 'assets' / 'audio'
+                audio_path = audio_dir / (
+                    'rank_up.ogg' if rank_changed else 'level_up.ogg'
+                )
+                if audio_path.exists():
+                    try:
+                        files.append(
+                            discord.File(str(audio_path), filename=audio_path.name)
+                        )
+                    except Exception:
+                        # Non-fatal: if file can't be attached, still send the message
+                        pass
+
+        if files:
+            await interaction.followup.send(content=message, files=files)
+        else:
+            await interaction.followup.send(message)
 
     @app_commands.command(
         name='recent', description='View and edit your recent activity records'
