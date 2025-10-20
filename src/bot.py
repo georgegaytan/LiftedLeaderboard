@@ -9,7 +9,7 @@ from discord.ext import commands
 from src.database.db_manager import DBManager
 from src.utils.env import load_env
 
-# --- Logging setup ---
+# Logging setup
 logging.basicConfig(
     level=logging.INFO,  # Min level to show: DEBUG<INFO<WARNING<ERROR<CRITICAL
     format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',

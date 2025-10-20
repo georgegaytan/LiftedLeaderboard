@@ -5,7 +5,7 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
-# --- Ensure consistent path regardless of where it's called from ---
+# Ensure consistent path regardless of where it's called from
 # Get absolute path to the directory this script lives in
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 MIGRATIONS_DIR = os.path.join(BASE_DIR, 'migrations')
