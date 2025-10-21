@@ -1,5 +1,7 @@
 from typing import Any, ClassVar, Iterable, Optional, Sequence, cast
 
+from psycopg.types.json import Json
+
 from src.database.db_manager import DBManager
 
 
@@ -54,11 +56,17 @@ class BaseModel:
         cols = list(values.keys())
         placeholders = ', '.join(['%s'] * len(cols))
         col_list = ', '.join(cols)
-        sql = (
+        sql_query = (
             f'INSERT INTO {cls.table} ({col_list}) VALUES ({placeholders}) RETURNING *'
         )
+
+        # Convert dicts to JSON for Postgres JSON/JSONB columns
+        params = [
+            Json(values[c]) if isinstance(values[c], dict) else values[c] for c in cols
+        ]
+
         with DBManager() as db:
-            rows = db.fetchall(sql, tuple(values[c] for c in cols))
+            rows = db.fetchall(sql_query, tuple(params))
         rows = cast(list[dict[str, Any]], rows)
         return cast(dict[str, Any], rows[0]) if rows else cast(dict[str, Any], {})
 
