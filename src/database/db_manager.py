@@ -175,6 +175,9 @@ class DBManager:
             )
             self._reconnect()
             return fn()
+        except Exception:
+            logger.exception('Unexpected error during DB operation')
+            raise
 
     def _exec_pg(self, query: str, params: Iterable[Any] | None) -> None:
         '''Execute a statement that does not return rows (INSERT, UPDATE, DELETE).'''
@@ -226,13 +229,25 @@ class DBManager:
         self, query: str, params: Iterable[Any] | None = None
     ) -> List[dict[str, Any]]:
         '''Return all rows as a list of dictionaries.'''
-        rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
-        return rows
+        try:
+            rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
+            return rows
+        except Exception as e:
+            logger.error(
+                f'Postgres fetchall() error: {e}\nQuery: {query}\nParams: {params}'
+            )
+            raise
 
     @require_connection
     def fetchone(
         self, query: str, params: Iterable[Any] | None = None
     ) -> Optional[dict[str, Any]]:
         '''Return a single row as a dictionary, or None if no result.'''
-        rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
-        return rows[0] if rows else None
+        try:
+            rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
+            return rows[0] if rows else None
+        except Exception as e:
+            logger.error(
+                f'Postgres fetchone() error: {e}\nQuery: {query}\nParams: {params}'
+            )
+            raise

@@ -7,6 +7,8 @@ import discord
 from discord import Interaction, app_commands
 from discord.ext import commands
 
+from src.achievements.engine import engine
+from src.achievements.events import ActivityRecordedEvent, RankChangedEvent
 from src.components.activity_records import RecentRecordsView
 from src.models.activity import Activity
 from src.models.activity_record import ActivityRecord
@@ -119,12 +121,15 @@ class ActivityRecordsCog(commands.Cog):
         t_after_insert = perf_counter()
 
         # XP is handled automatically by trigger
-        message = f"✅ Recorded: **{activity}** (+{activity_row['xp_value']} XP)"
+        message = f'✅ Recorded: **{activity}** (+{activity_row["xp_value"]} XP)'
         message += f'\n📂 Category: {category}'
         if note:
             message += f'\n📝 _{note}_'
         if date_occurred:
             message += f'\n📅 Date: {date_value}'
+
+        # Track achievements unlocked during this command
+        unlocked: list[dict] = []
 
         # Apply daily bonus after successful record
         if check_bonus:
@@ -138,6 +143,20 @@ class ActivityRecordsCog(commands.Cog):
             f'insert_block={t_after_insert - t_before_insert:.3f}s, '
             f'daily_bonus={t_done - t_after_insert:.3f}s'
         )
+
+        # Dispatch achievement event: activity recorded
+        try:
+            activity_category = activity_row['category']
+            unlocked += engine.dispatch(
+                ActivityRecordedEvent(
+                    user_id=user_id,
+                    activity_id=activity_id,
+                    category=activity_category,
+                    date_occurred=date.fromisoformat(date_value),
+                )
+            )
+        except Exception:
+            pass
 
         # Capture post-change level and rank and append notifications
         after_profile = User.get_profile(user_id)
@@ -153,7 +172,16 @@ class ActivityRecordsCog(commands.Cog):
             if rank_changed:
                 message += f'\n🏅 Rank up! {old_rank} → {new_rank}'
 
-            # Attach audio based on change
+                try:
+                    unlocked += engine.dispatch(
+                        RankChangedEvent(
+                            user_id=user_id,
+                            new_rank=new_rank,
+                        )
+                    )
+                except Exception as e:
+                    logger.exception(f'Failed to dispatch level changed event: {e}')
+
             if rank_changed or level_changed:
                 base = pathlib.Path(__file__).resolve().parents[1]  # points to src/
                 audio_dir = base / 'assets' / 'audio'
@@ -166,8 +194,18 @@ class ActivityRecordsCog(commands.Cog):
                             discord.File(str(audio_path), filename=audio_path.name)
                         )
                     except Exception:
-                        # Non-fatal: if file can't be attached, still send the message
-                        pass
+                        pass  # Non-fatal: if file cannot attach, still send the message
+
+        # Append unlocked achievements summary
+        if unlocked:
+            unique = {}
+            for a in unlocked:
+                unique[a.get('code')] = a
+            lines = [
+                f'- {a.get("name", "Achievement")} (+{int(a.get("xp_value", 0))} XP)'
+                for a in unique.values()
+            ]
+            message += '\n\n🏆 Achievements unlocked:\n' + '\n'.join(lines)
 
         if files:
             await interaction.followup.send(content=message, files=files)
