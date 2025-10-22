@@ -85,10 +85,10 @@ class DailyStreak1(BaseStreakAchievementRule):
     xp_value = 50
 
 
-class DailyStreak13(BaseStreakAchievementRule):
+class DailyStreak7(BaseStreakAchievementRule):
     code = 'streak_day_13'
     name = 'Lucky'
-    description = 'Recorded activities for 10 consecutive days.'
+    description = 'Recorded activities for 7 consecutive days.'
     period = 'day'
     length = 7
     xp_value = 130
@@ -294,7 +294,7 @@ class YearlyStreak4(BaseStreakAchievementRule):
 
 # Daily Streaks
 registry.register(DailyStreak1())
-registry.register(DailyStreak13())
+registry.register(DailyStreak7())
 registry.register(DailyStreak42())
 registry.register(DailyStreak69())
 registry.register(DailyStreak100())
