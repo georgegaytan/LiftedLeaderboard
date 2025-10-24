@@ -2,7 +2,7 @@ import random
 
 import discord
 
-from src.utils.constants import HEALTH_FACTS
+from src.utils.constants import HEALTH_FACTS, INSPIRATIONAL_QUOTES
 from src.utils.helper import level_to_rank
 
 
@@ -27,5 +27,5 @@ def leaderboard_embed(entries: list[tuple[str, int, int]]) -> discord.Embed:
             inline=False,
         )
 
-    embed.set_footer(text=random.choice(HEALTH_FACTS))
+    embed.set_footer(text=random.choice(HEALTH_FACTS + INSPIRATIONAL_QUOTES))
     return embed
