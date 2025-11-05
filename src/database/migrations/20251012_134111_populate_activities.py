@@ -14,7 +14,7 @@ ACTIVITIES = [
     ('Steps', 'Weekly Steps 35k+ (pick only one per week)', 5),
     ('Steps', 'Weekly Steps 70k+', 10),
     ('Steps', 'Weekly Steps 105k+', 15),
-    ('Steps', 'Daily Steps 140k+', 20),
+    ('Steps', 'Weekly Steps 140k+', 20),
     # === Hiking ===
     ('Hiking', '1 hour hiking', 3),
     ('Hiking', '2 hours hiking', 8),

@@ -1,6 +1,7 @@
 from datetime import date, datetime, timezone
 
 import discord
+import pendulum
 from discord import Interaction
 
 from src.models.activity import Activity
@@ -192,7 +193,7 @@ class RecordEditModal(discord.ui.Modal):
             max_length=500,
         )
         self.date_occurred = discord.ui.TextInput(
-            label='Date Activity Occurred (YYYY-MM-DD)',
+            label='Date Activity Occurred (i.e. YYYY-MM-DD or other standard formats)',
             style=discord.TextStyle.short,
             required=True,
             default=current_date,
@@ -207,10 +208,17 @@ class RecordEditModal(discord.ui.Modal):
         date_val = str(self.date_occurred.value).strip()
 
         try:
-            _ = date.fromisoformat(date_val)
+            # Parse the date using pendulum for flexible input
+            parsed_date = pendulum.parse(date_val, strict=False)
+            if not parsed_date:
+                raise ValueError('Could not parse date')
+            # Convert to date object and back to ISO format for consistency
+            date_val = parsed_date.date().isoformat()
         except Exception:
             await interaction.response.send_message(
-                '❌ Invalid date format. Use YYYY-MM-DD.', ephemeral=True
+                '❌ Invalid date format. '
+                'Try formats like: YYYY-MM-DD, MM/DD/YYYY, or "yesterday"',
+                ephemeral=True,
             )
             return
 
