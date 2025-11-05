@@ -4,6 +4,7 @@ from datetime import date, datetime, timezone
 from time import perf_counter
 
 import discord
+import pendulum
 from discord import Interaction, app_commands
 from discord.ext import commands
 
@@ -51,7 +52,7 @@ class ActivityRecordsCog(commands.Cog):
         category='Choose the category of activity (e.g., Running, Swimming, etc.)',
         activity='Select the specific activity',
         note='Optional note about your session',
-        date_occurred='When the activity occurred in YYYY-MM-DD (default: today)',
+        date_occurred='When the activity occurred i.e. YYYY-MM-DD (default: today)',
     )
     @app_commands.autocomplete(
         category=category_autocomplete, activity=activity_autocomplete
@@ -67,21 +68,27 @@ class ActivityRecordsCog(commands.Cog):
         '''Record an activity and automatically award XP.'''
         user_id = interaction.user.id
         display_name = interaction.user.display_name
-        date_value = date_occurred or date.today().isoformat()
+        date_occurred = date_occurred or date.today().isoformat()
         t0 = perf_counter()
 
         try:
-            date_obj = date.fromisoformat(date_value)
-        except ValueError:
+            date_obj = pendulum.parse(date_occurred, strict=False)
+            if not date_obj:
+                raise ValueError('Could not parse date')
+            date_obj = date_obj.date()  # Convert to date object for consistency
+        except Exception as e:
+            logger.debug(f"Failed to parse date '{date_occurred}': {e}")
             await interaction.response.send_message(
-                '❌ Invalid date format. Use YYYY-MM-DD.', ephemeral=True
+                '❌ Invalid date format. '
+                'Try formats like: YYYY-MM-DD, MM/DD/YYYY, or "yesterday"',
+                ephemeral=True,
             )
             return
 
         # Ensure user exists
         User.upsert_user(user_id, display_name)
-        # Optionally convert back to string to normalize
-        date_value = date_obj.isoformat()
+        # Convert to ISO format string for consistency
+        date_occurred_isoformat: str = date_obj.isoformat()
 
         # Capture pre-change level and rank
         before_profile = User.get_profile(user_id)
@@ -89,10 +96,8 @@ class ActivityRecordsCog(commands.Cog):
         old_rank = level_to_rank(old_level)
 
         # Daily bonus check (first record today)
-        check_bonus = False
-        today_str = datetime.now(timezone.utc).date().isoformat()
-        if date_value == today_str:
-            check_bonus = not ActivityRecord.has_record_on_date(user_id, today_str)
+        today_isoformat = datetime.now(timezone.utc).date().isoformat()
+        check_bonus = not ActivityRecord.has_record_on_date(user_id, today_isoformat)
 
         # Lookup activity
         activity_row = Activity.get_by_name_category(
@@ -116,7 +121,7 @@ class ActivityRecordsCog(commands.Cog):
             user_id=user_id,
             activity_id=activity_id,
             note=note,
-            date_occurred=date_value,
+            date_occurred=date_occurred_isoformat,
         )
         t_after_insert = perf_counter()
 
@@ -125,8 +130,8 @@ class ActivityRecordsCog(commands.Cog):
         message += f'\n📂 Category: {category}'
         if note:
             message += f'\n📝 _{note}_'
-        if date_occurred:
-            message += f'\n📅 Date: {date_value}'
+        if date_occurred_isoformat != today_isoformat:
+            message += f'\n📅 Date: {date_occurred_isoformat}'
 
         # Track achievements unlocked during this command
         unlocked: list[dict] = []
@@ -152,7 +157,7 @@ class ActivityRecordsCog(commands.Cog):
                     user_id=user_id,
                     activity_id=activity_id,
                     category=activity_category,
-                    date_occurred=date.fromisoformat(date_value),
+                    date_occurred=date.fromisoformat(date_occurred_isoformat),
                 )
             )
         except Exception:
