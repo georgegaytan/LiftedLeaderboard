@@ -51,6 +51,11 @@ INSPIRATIONAL_QUOTES = [
     '"Lift heavy, work hard, get plenty of sleep, and eat right." - Ronnie Coleman', # noqa: E501
     '“The secret of getting ahead is getting started. The secret of lasting is pacing yourself.” - Mark Twain', # noqa: E501
     '“Recovery is as important as the workout itself.” - Greg Glassman', # noqa: E501
+    '"The only bad workout is the one that didn\'t happen." - Sam Sulek', # noqa: E501
+    '"You don’t have to be extreme, just consistent." - Sam Sulek', # noqa: E501
+    '"Fitness is not about being better than someone else. It’s about being better than you used to be." - Sam Sulek', # noqa: E501
+    '"The person who enjoys walking, will walk further than the person who enjoys the destination." - Sam Sulek', # noqa: E501
+    '"You’re not them and you’re not supposed to be. It’s you vs who you were yesterday." - Sam Sulek', # noqa: E501
 ]
 
 RANKS = [
