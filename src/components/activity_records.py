@@ -193,7 +193,7 @@ class RecordEditModal(discord.ui.Modal):
             max_length=500,
         )
         self.date_occurred = discord.ui.TextInput(
-            label='Date Activity Occurred (i.e. YYYY-MM-DD or other standard formats)',
+            label='Date Activity Occurred (YYYY-MM-DD format)',
             style=discord.TextStyle.short,
             required=True,
             default=current_date,
