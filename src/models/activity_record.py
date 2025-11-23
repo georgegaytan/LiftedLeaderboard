@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Literal, cast
+from typing import Any, Literal, Optional, cast
 
 from src.database.db_manager import DBManager
 from src.models.base import BaseModel
@@ -15,6 +15,7 @@ class ActivityRecord(BaseModel):
         activity_id: int,
         note: str | None,
         date_occurred: str,
+        message_id: int | None = None,
     ) -> dict[str, Any]:
         return cls.create(
             {
@@ -22,8 +23,22 @@ class ActivityRecord(BaseModel):
                 'activity_id': activity_id,
                 'note': note,
                 'date_occurred': date_occurred,
+                'message_id': message_id,
             }
         )
+
+    @classmethod
+    def get_by_message_id(cls, message_id: int) -> dict[str, Any] | None:
+        with DBManager() as db:
+            row = db.fetchone(
+                'SELECT ar.*, a.name AS activity_name, '
+                'a.category AS category, a.xp_value AS xp_value '
+                'FROM activity_records ar '
+                'JOIN activities a ON a.id = ar.activity_id '
+                'WHERE ar.message_id = %s',
+                (message_id,),
+            )
+        return cast(Optional[dict[str, Any]], row)
 
     @classmethod
     def has_record_on_date(cls, user_id: int | str, date_iso: str) -> bool:
@@ -49,9 +64,16 @@ class ActivityRecord(BaseModel):
         else:
             order_clause = 'ORDER BY ar.date_occurred DESC, ar.id DESC'
         sql = (
-            'SELECT ar.id AS id, ar.note AS note, ar.date_occurred AS date_occurred, '
-            'ar.created_at AS created_at, ar.updated_at AS updated_at, '
-            'a.name AS activity_name, a.category AS category, a.xp_value AS xp_value '
+            'SELECT '
+            'ar.id AS id, '
+            'ar.note AS note, '
+            'ar.date_occurred AS date_occurred, '
+            'ar.created_at AS created_at, '
+            'ar.updated_at AS updated_at, '
+            'ar.message_id AS message_id, '
+            'a.name AS activity_name, '
+            'a.category AS category, '
+            'a.xp_value AS xp_value '
             'FROM activity_records ar '
             'JOIN activities a ON a.id = ar.activity_id '
             'WHERE ar.user_id = %s AND a.is_archived = FALSE '

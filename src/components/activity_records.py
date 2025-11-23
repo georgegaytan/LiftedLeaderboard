@@ -1,3 +1,4 @@
+import logging
 from datetime import date, datetime, timezone
 
 import discord
@@ -7,6 +8,8 @@ from discord import Interaction
 from src.models.activity import Activity
 from src.models.activity_record import ActivityRecord
 from src.models.user import User
+
+logger = logging.getLogger(__name__)
 
 
 class RecentRecordsView(discord.ui.View):
@@ -18,7 +21,6 @@ class RecentRecordsView(discord.ui.View):
         options = []
         for idx, r in enumerate(records, start=1):
             label = f"{idx}. {r['activity_name']}"
-            # Coerce date to ISO string for Discord component JSON
             d = r['date_occurred']
             d_str = d.isoformat() if isinstance(d, date) else str(d)
             description = f"{r['category']} • {d_str}"
@@ -40,16 +42,19 @@ class RecentRecordsView(discord.ui.View):
 
 
 class RecordEditView(discord.ui.View):
-    def __init__(self, record: dict, requestor_id: int):
+    def __init__(
+        self, record: dict, requestor_id: int, interaction: Interaction | None = None
+    ):
         super().__init__(timeout=180)
         self.record = record
         self.requestor_id = requestor_id
+        self.interaction = interaction
         self.selected_category: str = record['category']
         self.selected_activity: str = record['activity_name']
         self.current_note: str | None = record['note']
-        # Ensure current_date is a string (Postgres DATE may come as date object)
         d = record['date_occurred']
         self.current_date: str = d.isoformat() if isinstance(d, date) else str(d)
+        self.message_id = record.get('message_id')  # Store message_id from the record
 
         categories = self._fetch_categories()
         activities = self._fetch_activities(self.selected_category)
@@ -97,19 +102,15 @@ class _RecordSelect(discord.ui.Select):
             )
             return
 
-        if not self.values:
-            await interaction.response.send_message(
-                'No record selected.', ephemeral=True
-            )
-            return
-
         record_id = int(self.values[0])
-        rec = next((r for r in view.records if r['id'] == record_id), None)
-        if not rec:
+        record = next((r for r in view.records if r['id'] == record_id), None)
+        if not record:
             await interaction.response.send_message('Record not found.', ephemeral=True)
             return
 
-        edit_view = RecordEditView(record=rec, requestor_id=view.requestor_id)
+        edit_view = RecordEditView(
+            record=record, requestor_id=view.requestor_id, interaction=interaction
+        )
         await interaction.response.edit_message(view=edit_view)
 
 
@@ -130,13 +131,8 @@ class CategorySelect(discord.ui.Select):
                 'Internal error: invalid view.', ephemeral=True
             )
             return
+
         v.selected_category = self.values[0]
-        v.category_select.options = [
-            discord.SelectOption(
-                label=c.label, value=c.value, default=(c.value == v.selected_category)
-            )
-            for c in self.options
-        ]
         activities = v._fetch_activities(v.selected_category)
         v.selected_activity = activities[0] if activities else ''
         v.activity_select.options = [
@@ -177,6 +173,8 @@ class RecordEditModal(discord.ui.Modal):
         current_note: str | None,
         current_date: str,
         parent_view: RecordEditView | None = None,
+        original_message_id: int | None = None,
+        original_channel_id: int | None = None,
     ):
         super().__init__(title='Edit Note/Date')
         self.record_id = record_id
@@ -184,6 +182,8 @@ class RecordEditModal(discord.ui.Modal):
         self.staged_category = staged_category
         self.staged_activity_name = staged_activity_name
         self.parent_view = parent_view
+        self.original_message_id = original_message_id
+        self.original_channel_id = original_channel_id
 
         self.note = discord.ui.TextInput(
             label='Note about Activity (Optional)',
@@ -222,6 +222,25 @@ class RecordEditModal(discord.ui.Modal):
             )
             return
 
+        # Get the current record to ensure we have the latest data
+        record = ActivityRecord.get(self.record_id)
+        if not record:
+            await interaction.response.send_message(
+                '❌ Record not found.',
+                ephemeral=True,
+            )
+            return
+
+        # Get the activity details to ensure we have the correct XP value
+        activity = Activity.get(self.staged_activity_id)
+        if not activity:
+            await interaction.response.send_message(
+                '❌ Activity not found.',
+                ephemeral=True,
+            )
+            return
+
+        # Update the record in the database
         ActivityRecord.update_record(
             record_id=self.record_id,
             activity_id=self.staged_activity_id,
@@ -229,11 +248,70 @@ class RecordEditModal(discord.ui.Modal):
             date_occurred=date_val,
         )
 
-        await interaction.response.send_message(
-            f'✅ Updated record: {self.staged_activity_name} ({self.staged_category}) '
-            f'on {date_val}',
-            ephemeral=True,
+        # Build the updated message content with the correct XP value
+        xp_value = activity.get('xp_value', 0)
+        message_content = (
+            f'✅ Recorded: **{self.staged_activity_name}** (+{xp_value} XP)\n'
         )
+        if note_val:
+            message_content += f'📝 _{note_val}_\n'
+        message_content += f'📂 Category: {self.staged_category}\n'
+        today_iso = datetime.now(timezone.utc).date().isoformat()
+        if date_val != today_iso:
+            message_content += f'📅 Date: {date_val}'
+
+        # Defer the response first to prevent interaction timeout
+        await interaction.response.defer(ephemeral=True)
+
+        try:
+            # Try to edit the original message
+            if self.original_channel_id and self.original_message_id:
+                channel = interaction.guild.get_channel(self.original_channel_id)
+                if channel and isinstance(
+                    channel, (discord.TextChannel, discord.Thread)
+                ):
+                    try:
+                        message = await channel.fetch_message(
+                            int(self.original_message_id)
+                        )
+                        await message.edit(content=message_content)
+                        await interaction.followup.send(
+                            f'✅ Updated record: {self.staged_activity_name} '
+                            f'({self.staged_category})',
+                            ephemeral=True,
+                            delete_after=5,
+                        )
+                        return
+                    except discord.NotFound:
+                        logger.warning(
+                            f'Original message {self.original_message_id} '
+                            f'not found in channel {self.original_channel_id}'
+                        )
+                    except discord.Forbidden:
+                        logger.warning(
+                            f'Missing permissions to edit message '
+                            f'{self.original_message_id} '
+                            f'in channel {self.original_channel_id}'
+                        )
+                    except Exception as e:
+                        logger.error(f'Error editing message: {e}')
+
+                        # Fallback to send a new message if we can't edit the original
+                        await interaction.followup.send(
+                            f'✅ Updated record: {self.staged_activity_name} '
+                            f'({self.staged_category})',
+                            ephemeral=True,
+                        )
+
+        except Exception as e:
+            logger.error(f'Error in RecordEditModal.on_submit: {e}')
+            try:
+                await interaction.followup.send(
+                    f'✅ Updated record but failed to update message: {str(e)}',
+                    ephemeral=True,
+                )
+            except Exception as e2:
+                logger.error(f'Failed to send error message to user: {e2}')
 
 
 class DeleteConfirmModal(discord.ui.Modal):
@@ -266,6 +344,7 @@ class DeleteConfirmModal(discord.ui.Modal):
 
         user_id = rec.get('user_id')
         created_at: datetime = rec.get('created_at')  # type: ignore[assignment]
+        message_id = rec.get('message_id')
 
         # If this record is the only one created today for the user, remove daily bonus
         try:
@@ -283,6 +362,35 @@ class DeleteConfirmModal(discord.ui.Modal):
             # Best-effort; proceed with deletion regardless
             pass
 
+        # Best-effort: delete the associated Discord message if we know its ID
+        if message_id:
+            try:
+                channel = interaction.channel
+                # TextChannel, Thread, DMChannel all implement fetch_message
+                if channel and hasattr(channel, 'fetch_message'):
+                    try:
+                        msg = await channel.fetch_message(int(message_id))
+                        await msg.delete()
+                    except discord.NotFound:
+                        logger.warning(
+                            f'Associated message {message_id} not found in channel '
+                            f'{getattr(channel, "id", "unknown")}'
+                        )
+                    except discord.Forbidden:
+                        logger.warning(
+                            f'Missing permissions to delete message {message_id} '
+                            f'in channel {getattr(channel, "id", "unknown")}'
+                        )
+                    except Exception as e:
+                        logger.error(
+                            f'Error deleting associated message {message_id}: {e}'
+                        )
+            except Exception as e:
+                logger.error(
+                    f'Unexpected error while deleting associated message '
+                    f'{message_id}: {e}'
+                )
+
         ActivityRecord.delete_record(self.record_id)
 
         await interaction.response.send_message(
@@ -296,14 +404,14 @@ class DeleteButton(discord.ui.Button):
         self.parent_view = parent_view
 
     async def callback(self, interaction: Interaction):
-        v = self.parent_view
-        if not isinstance(v, RecordEditView):
+        view = self.parent_view
+        if not isinstance(view, RecordEditView):
             await interaction.response.send_message(
                 'Internal error: invalid view.', ephemeral=True
             )
             return
 
-        modal = DeleteConfirmModal(record_id=v.record['id'])
+        modal = DeleteConfirmModal(record_id=view.record['id'])
         await interaction.response.send_modal(modal)
 
 
@@ -320,23 +428,17 @@ class ContinueButton(discord.ui.Button):
             )
             return
 
-        category = v.selected_category
+        # Get the activity ID for the selected activity
         activity_name = v.selected_activity
-
-        if not category or not activity_name:
-            await interaction.response.send_message(
-                'Please select a category and activity first.', ephemeral=True
-            )
-            return
-
+        category = v.selected_category
         row = Activity.get_by_name_category(activity_name, category, active_only=True)
-
         if not row:
             await interaction.response.send_message(
-                '❌ Selected activity not found.', ephemeral=True
+                '❌ Error: Activity not found.', ephemeral=True
             )
             return
 
+        # Show the edit modal
         modal = RecordEditModal(
             record_id=v.record['id'],
             staged_activity_id=row['id'],
@@ -345,5 +447,9 @@ class ContinueButton(discord.ui.Button):
             current_note=v.current_note,
             current_date=v.current_date,
             parent_view=v,
+            original_message_id=v.message_id,  # Use the stored message_id
+            original_channel_id=getattr(interaction.channel, 'id', None)
+            if interaction.channel
+            else None,
         )
         await interaction.response.send_modal(modal)

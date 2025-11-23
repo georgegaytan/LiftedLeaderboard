@@ -55,3 +55,32 @@ class User(BaseModel):
                 (limit,),
             )
         return cast(list[dict[str, Any]], rows)
+
+    @classmethod
+    def set_last_record_message_id(
+        cls, user_id: int | str, message_id: int | None
+    ) -> None:
+        with DBManager() as db:
+            db.execute(
+                'ALTER TABLE users '
+                'ADD COLUMN IF NOT EXISTS last_record_message_id BIGINT',
+                (),
+            )
+            db.execute(
+                'UPDATE users SET last_record_message_id = %s WHERE id = %s',
+                (message_id, user_id),
+            )
+
+    @classmethod
+    def get_last_record_message_id(cls, user_id: int | str) -> int | None:
+        with DBManager() as db:
+            db.execute(
+                'ALTER TABLE users '
+                'ADD COLUMN IF NOT EXISTS last_record_message_id BIGINT',
+                (),
+            )
+            result = db.fetchone(
+                'SELECT last_record_message_id FROM users WHERE id = %s',
+                (user_id,),
+            )
+            return result[0] if result and result[0] else None
