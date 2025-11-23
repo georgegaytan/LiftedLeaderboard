@@ -77,7 +77,7 @@ class ActivityRecordsCog(commands.Cog):
                 raise ValueError('Could not parse date')
             date_obj = date_obj.date()  # Convert to date object for consistency
         except Exception as e:
-            logger.debug(f"Failed to parse date '{date_occurred}': {e}")
+            logger.debug(f'Failed to parse date "{date_occurred}": {e}')
             await interaction.response.send_message(
                 '❌ Invalid date format. '
                 'Try formats like: YYYY-MM-DD, MM/DD/YYYY, or "yesterday"',
@@ -117,15 +117,23 @@ class ActivityRecordsCog(commands.Cog):
         t_before_insert = perf_counter()
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=True)
+
+        # Send initial message and create record
+        initial_message = await interaction.followup.send(
+            '⏳ Recording your activity...', wait=True
+        )
+
+        # Create the activity record
         ActivityRecord.insert(
             user_id=user_id,
             activity_id=activity_id,
             note=note,
             date_occurred=date_occurred_isoformat,
+            message_id=initial_message.id,
         )
         t_after_insert = perf_counter()
 
-        # XP is handled automatically by trigger
+        # Build the success message
         message = f'✅ Recorded: **{activity}** (+{activity_row["xp_value"]} XP)'
         message += f'\n📂 Category: {category}'
         if note:
@@ -212,10 +220,19 @@ class ActivityRecordsCog(commands.Cog):
             ]
             message += '\n\n🏆 Achievements unlocked:\n' + '\n'.join(lines)
 
-        if files:
-            await interaction.followup.send(content=message, files=files)
-        else:
-            await interaction.followup.send(message)
+        # Edit the initial message with the final content
+        try:
+            if files:
+                await initial_message.edit(content=message, files=files)
+            else:
+                await initial_message.edit(content=message)
+        except Exception as e:
+            logger.error(f'Failed to edit message: {e}')
+            # Fallback to sending a new message if editing fails
+            if files:
+                await interaction.followup.send(content=message, files=files)
+            else:
+                await interaction.followup.send(message)
 
     @app_commands.command(
         name='recent', description='View and edit your recent activity records'
@@ -279,11 +296,30 @@ class ActivityRecordsCog(commands.Cog):
             embed.add_field(name=label, value=details, inline=False)
 
         view = RecentRecordsView(requestor_id=user_id, records=rows)
-        await interaction.response.send_message(
-            embed=embed,
-            view=view,
-            ephemeral=True,
-        )
+
+        if interaction.message and interaction.message.reference:
+            try:
+                # Try to get the referenced message
+                reference_message = await interaction.channel.fetch_message(
+                    interaction.message.reference.message_id
+                )
+                if reference_message and reference_message.author == self.bot.user:
+                    # Edit the referenced message if it's from the bot
+                    await reference_message.edit(embed=embed, view=view)
+                    await interaction.response.send_message(
+                        '✅ Updated the activity record.', ephemeral=True, delete_after=5
+                    )
+                    return
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                pass  # Fall through to normal behavior
+
+        # If not a reply or couldn't edit the referenced message, send a new one
+        if not interaction.response.is_done():
+            await interaction.response.send_message(
+                embed=embed,
+                view=view,
+                ephemeral=True,
+            )
 
 
 async def setup(bot: commands.Bot):

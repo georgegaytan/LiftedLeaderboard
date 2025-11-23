@@ -15,6 +15,7 @@ class ActivityRecord(BaseModel):
         activity_id: int,
         note: str | None,
         date_occurred: str,
+        message_id: int | None = None,
     ) -> dict[str, Any]:
         return cls.create(
             {
@@ -22,6 +23,7 @@ class ActivityRecord(BaseModel):
                 'activity_id': activity_id,
                 'note': note,
                 'date_occurred': date_occurred,
+                'message_id': message_id,
             }
         )
 
@@ -49,9 +51,16 @@ class ActivityRecord(BaseModel):
         else:
             order_clause = 'ORDER BY ar.date_occurred DESC, ar.id DESC'
         sql = (
-            'SELECT ar.id AS id, ar.note AS note, ar.date_occurred AS date_occurred, '
-            'ar.created_at AS created_at, ar.updated_at AS updated_at, '
-            'a.name AS activity_name, a.category AS category, a.xp_value AS xp_value '
+            'SELECT '
+            'ar.id AS id, '
+            'ar.note AS note, '
+            'ar.date_occurred AS date_occurred, '
+            'ar.created_at AS created_at, '
+            'ar.updated_at AS updated_at, '
+            'ar.message_id AS message_id, '
+            'a.name AS activity_name, '
+            'a.category AS category, '
+            'a.xp_value AS xp_value '
             'FROM activity_records ar '
             'JOIN activities a ON a.id = ar.activity_id '
             'WHERE ar.user_id = %s AND a.is_archived = FALSE '
