@@ -234,9 +234,6 @@ class ActivityRecordsCog(commands.Cog):
             else:
                 await interaction.followup.send(message)
 
-        # Store the message ID in the database for potential updates by /recent
-        User.set_last_record_message_id(user_id, initial_message.id)
-
     @app_commands.command(
         name='recent', description='View and edit your recent activity records'
     )
