@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Any, Literal, Optional, cast
+from typing import Any, Literal, cast
 
 from src.database.db_manager import DBManager
 from src.models.base import BaseModel
@@ -26,19 +26,6 @@ class ActivityRecord(BaseModel):
                 'message_id': message_id,
             }
         )
-
-    @classmethod
-    def get_by_message_id(cls, message_id: int) -> dict[str, Any] | None:
-        with DBManager() as db:
-            row = db.fetchone(
-                'SELECT ar.*, a.name AS activity_name, '
-                'a.category AS category, a.xp_value AS xp_value '
-                'FROM activity_records ar '
-                'JOIN activities a ON a.id = ar.activity_id '
-                'WHERE ar.message_id = %s',
-                (message_id,),
-            )
-        return cast(Optional[dict[str, Any]], row)
 
     @classmethod
     def has_record_on_date(cls, user_id: int | str, date_iso: str) -> bool:
