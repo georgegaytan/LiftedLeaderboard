@@ -3,6 +3,7 @@ import logging
 import pathlib
 from datetime import date, datetime, timezone
 from time import perf_counter
+from typing import TypedDict
 
 import discord
 import pendulum
@@ -20,6 +21,21 @@ from src.utils.helper import level_to_rank
 logger = logging.getLogger(__name__)
 
 
+class _CategoryCache(TypedDict):
+    expires_at: float
+    data: list[str]
+
+
+class _ActivityCacheEntry(TypedDict):
+    expires_at: float
+    data: list[str]
+
+
+_CATEGORY_CACHE_TTL_SECONDS = 604800  # 1 week
+_category_cache: _CategoryCache = {'expires_at': 0.0, 'data': []}
+_activity_cache: dict[str, _ActivityCacheEntry] = {}
+
+
 class ActivityRecordsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
@@ -28,7 +44,18 @@ class ActivityRecordsCog(commands.Cog):
     async def category_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete available categories from the DB.'''
         # Filter client-side after fetching limited categories
-        categories = await asyncio.to_thread(Activity.list_categories, active_only=True)
+        now = perf_counter()
+        cache = _category_cache
+        categories: list[str]
+        if cache['data'] and cache['expires_at'] > now:
+            categories = cache['data']  # type: ignore[assignment]
+            logger.info(f'Using cached categories {categories}')
+        else:
+            categories = await asyncio.to_thread(
+                Activity.list_categories, active_only=True
+            )
+            cache['data'] = categories
+            cache['expires_at'] = now + _CATEGORY_CACHE_TTL_SECONDS
         cur = (current or '').lower()
         filtered = [c for c in categories if cur in c.lower()]
         return [app_commands.Choice(name=c, value=c) for c in filtered]
@@ -40,10 +67,21 @@ class ActivityRecordsCog(commands.Cog):
         category = interaction.namespace.category
         if not category:
             return []  # No category selected yet
-        rows = await asyncio.to_thread(
-            Activity.list_by_category, category, active_only=True
-        )
-        names = [a['name'] for a in rows]
+        now = perf_counter()
+        entry = _activity_cache.get(category)
+        names: list[str]
+        if entry and entry.get('data') and entry.get('expires_at', 0.0) > now:
+            names = entry['data']  # type: ignore[assignment]
+            logger.info(f'Using cached activities {names}')
+        else:
+            rows = await asyncio.to_thread(
+                Activity.list_by_category, category, active_only=True
+            )
+            names = [a['name'] for a in rows]
+            _activity_cache[category] = {
+                'data': names,
+                'expires_at': now + _CATEGORY_CACHE_TTL_SECONDS,
+            }
         cur = (current or '').lower()
         filtered = [n for n in names if cur in n.lower()]
         return [app_commands.Choice(name=n, value=n) for n in filtered]
