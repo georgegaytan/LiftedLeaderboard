@@ -31,9 +31,42 @@ class _ActivityCacheEntry(TypedDict):
     data: list[str]
 
 
-_CATEGORY_CACHE_TTL_SECONDS = 604800  # 1 week
+_CACHE_TTL_SECONDS = 604800  # 1 week
 _category_cache: _CategoryCache = {'expires_at': 0.0, 'data': []}
 _activity_cache: dict[str, _ActivityCacheEntry] = {}
+_activity_cache_warmed = False
+
+
+async def _warm_activity_cache_if_needed(now: float) -> None:
+    global _activity_cache_warmed
+
+    if _activity_cache_warmed:
+        return
+
+    # Reuse category cache if valid, otherwise hit DB
+    cat_cache = _category_cache
+    if cat_cache['data'] and cat_cache['expires_at'] > now:
+        categories = cat_cache['data']
+    else:
+        categories = await asyncio.to_thread(Activity.list_categories, active_only=True)
+        cat_cache['data'] = categories
+        cat_cache['expires_at'] = now + _CACHE_TTL_SECONDS
+
+    for cat in categories:
+        try:
+            rows_all = await asyncio.to_thread(
+                Activity.list_by_category, cat, active_only=True
+            )
+            all_names = [a['name'] for a in rows_all]
+            _activity_cache[cat] = {
+                'data': all_names,
+                'expires_at': now + _CACHE_TTL_SECONDS,
+            }
+        except Exception:
+            # Best-effort warming; skip errors for individual categories
+            continue
+
+    _activity_cache_warmed = True
 
 
 class ActivityRecordsCog(commands.Cog):
@@ -55,7 +88,7 @@ class ActivityRecordsCog(commands.Cog):
                 Activity.list_categories, active_only=True
             )
             cache['data'] = categories
-            cache['expires_at'] = now + _CATEGORY_CACHE_TTL_SECONDS
+            cache['expires_at'] = now + _CACHE_TTL_SECONDS
         cur = (current or '').lower()
         filtered = [c for c in categories if cur in c.lower()]
         return [app_commands.Choice(name=c, value=c) for c in filtered]
@@ -63,11 +96,13 @@ class ActivityRecordsCog(commands.Cog):
     # Autocomplete for activity based on selected category
     async def activity_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete activity names within the selected category.'''
-        # Check what category the user has currently selected
         category = interaction.namespace.category
         if not category:
             return []  # No category selected yet
+
         now = perf_counter()
+        await _warm_activity_cache_if_needed(now)
+
         entry = _activity_cache.get(category)
         names: list[str]
         if entry and entry.get('data') and entry.get('expires_at', 0.0) > now:
@@ -80,7 +115,7 @@ class ActivityRecordsCog(commands.Cog):
             names = [a['name'] for a in rows]
             _activity_cache[category] = {
                 'data': names,
-                'expires_at': now + _CATEGORY_CACHE_TTL_SECONDS,
+                'expires_at': now + _CACHE_TTL_SECONDS,
             }
         cur = (current or '').lower()
         filtered = [n for n in names if cur in n.lower()]
