@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import pathlib
 from datetime import date, datetime, timezone
@@ -27,7 +28,7 @@ class ActivityRecordsCog(commands.Cog):
     async def category_autocomplete(self, interaction: Interaction, current: str):
         '''Autocomplete available categories from the DB.'''
         # Filter client-side after fetching limited categories
-        categories = Activity.list_categories(active_only=True)
+        categories = await asyncio.to_thread(Activity.list_categories, active_only=True)
         cur = (current or '').lower()
         filtered = [c for c in categories if cur in c.lower()]
         return [app_commands.Choice(name=c, value=c) for c in filtered]
@@ -39,9 +40,10 @@ class ActivityRecordsCog(commands.Cog):
         category = interaction.namespace.category
         if not category:
             return []  # No category selected yet
-        names = [
-            a['name'] for a in Activity.list_by_category(category, active_only=True)
-        ]
+        rows = await asyncio.to_thread(
+            Activity.list_by_category, category, active_only=True
+        )
+        names = [a['name'] for a in rows]
         cur = (current or '').lower()
         filtered = [n for n in names if cur in n.lower()]
         return [app_commands.Choice(name=n, value=n) for n in filtered]
@@ -86,22 +88,27 @@ class ActivityRecordsCog(commands.Cog):
             return
 
         # Ensure user exists
-        User.upsert_user(user_id, display_name)
+        await asyncio.to_thread(User.upsert_user, user_id, display_name)
         # Convert to ISO format string for consistency
         date_occurred_isoformat: str = date_obj.isoformat()
 
         # Capture pre-change level and rank
-        before_profile = User.get_profile(user_id)
+        before_profile = await asyncio.to_thread(User.get_profile, user_id)
         old_level = int(before_profile['level']) if before_profile else 1
         old_rank = level_to_rank(old_level)
 
         # Daily bonus check (first record today)
         today_isoformat = datetime.now(timezone.utc).date().isoformat()
-        check_bonus = not ActivityRecord.has_record_on_date(user_id, today_isoformat)
+        check_bonus = not await asyncio.to_thread(
+            ActivityRecord.has_record_on_date, user_id, today_isoformat
+        )
 
         # Lookup activity
-        activity_row = Activity.get_by_name_category(
-            activity, category, active_only=True
+        activity_row = await asyncio.to_thread(
+            Activity.get_by_name_category,
+            activity,
+            category,
+            active_only=True,
         )
 
         if not activity_row:
@@ -124,7 +131,8 @@ class ActivityRecordsCog(commands.Cog):
         )
 
         # Create the activity record
-        ActivityRecord.insert(
+        await asyncio.to_thread(
+            ActivityRecord.insert,
             user_id=user_id,
             activity_id=activity_id,
             note=note,
@@ -146,7 +154,7 @@ class ActivityRecordsCog(commands.Cog):
 
         # Apply daily bonus after successful record
         if check_bonus:
-            User.add_daily_bonus(user_id)
+            await asyncio.to_thread(User.add_daily_bonus, user_id)
             message += '\n🎁 Daily bonus: +10 XP'
 
         t_done = perf_counter()
@@ -172,7 +180,7 @@ class ActivityRecordsCog(commands.Cog):
             pass
 
         # Capture post-change level and rank and append notifications
-        after_profile = User.get_profile(user_id)
+        after_profile = await asyncio.to_thread(User.get_profile, user_id)
         files: list[discord.File] = []
         if after_profile and 'level' in after_profile:
             new_level = int(after_profile['level'])
