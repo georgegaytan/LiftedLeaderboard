@@ -58,6 +58,7 @@ class AchievementsEngine:
                     {
                         'code': ach.get('code'),
                         'name': ach.get('name'),
+                        'description': ach.get('description'),
                         'xp_value': int(ach.get('xp_value', 0)),
                     }
                 )

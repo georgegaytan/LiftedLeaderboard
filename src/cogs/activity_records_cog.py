@@ -215,7 +215,8 @@ class ActivityRecordsCog(commands.Cog):
             for a in unlocked:
                 unique[a.get('code')] = a
             lines = [
-                f'- {a.get("name", "Achievement")} (+{int(a.get("xp_value", 0))} XP)'
+                f'- {a.get("name", "Achievement")} (+{int(a.get("xp_value", 0))} XP) \n'
+                f'- _{a.get("description", "Achievement Description")}_'
                 for a in unique.values()
             ]
             message += '\n\n🏆 Achievements unlocked:\n' + '\n'.join(lines)
