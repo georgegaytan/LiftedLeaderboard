@@ -60,7 +60,7 @@ class ActivityRecord(BaseModel):
         exclude_record_id: int | None = None,
     ) -> bool:
         if group_key == 'steps_daily':
-            where = "a.category = 'Steps' AND a.name LIKE 'Daily Steps%'"
+            where = "a.category = 'Steps' AND a.name LIKE 'Daily Steps%%'"
         else:
             raise ValueError(f'Unknown daily group_key: {group_key}')
 
@@ -90,7 +90,7 @@ class ActivityRecord(BaseModel):
         exclude_record_id: int | None = None,
     ) -> bool:
         if group_key == 'steps_weekly':
-            where = "a.category = 'Steps' AND a.name LIKE 'Weekly Steps%'"
+            where = "a.category = 'Steps' AND a.name LIKE 'Weekly Steps%%'"
         elif group_key == 'recovery_weekly_sleep':
             where = (
                 "a.category = 'Recovery' AND a.name IN ("
@@ -103,15 +103,15 @@ class ActivityRecord(BaseModel):
         else:
             raise ValueError(f'Unknown weekly group_key: {group_key}')
 
-        # Rolling window ending at date_iso, inclusive.
+        # Rolling window around date_iso, inclusive.
         sql = (
             'SELECT 1 FROM activity_records ar '
             'JOIN activities a ON a.id = ar.activity_id '
             f'WHERE ar.user_id = %s AND {where} '
-            'AND ar.date_occurred > (%s::date - (%s * INTERVAL \'1 day\')) '
-            'AND ar.date_occurred <= %s::date'
+            'AND ar.date_occurred >= (%s::date - (%s * INTERVAL \'1 day\')) '
+            'AND ar.date_occurred <= (%s::date + (%s * INTERVAL \'1 day\'))'
         )
-        params: list[Any] = [user_id, date_iso, days, date_iso]
+        params: list[Any] = [user_id, date_iso, days, date_iso, days]
         if exclude_record_id is not None:
             sql += ' AND ar.id <> %s'
             params.append(exclude_record_id)
