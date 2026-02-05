@@ -191,6 +191,55 @@ class ActivityRecordsCog(commands.Cog):
         xp_value = int(activity_row["xp_value"])
         activity_id = activity_row["id"]
 
+        # Duplicate validation
+        activity_name = str(activity_row.get("name", activity))
+        group_key = ActivityRecord._activity_group_key(category, activity_name)
+        if group_key == "steps_daily":
+            dup = await asyncio.to_thread(
+                ActivityRecord.has_group_activity_on_date,
+                user_id,
+                group_key,
+                date_iso,
+            )
+            if dup:
+                await interaction.response.send_message(
+                    "❌ You already recorded a Daily Steps activity for that day.",
+                    ephemeral=True,
+                )
+                return
+        else:
+            dup = await asyncio.to_thread(
+                ActivityRecord.has_activity_on_date,
+                user_id,
+                activity_id,
+                date_iso,
+            )
+            if dup:
+                await interaction.response.send_message(
+                    "❌ You already recorded that activity for that day.",
+                    ephemeral=True,
+                )
+                return
+
+        if group_key in {
+            "steps_weekly",
+            "recovery_weekly_sleep",
+            "diet_weekly_no_alcohol",
+        }:
+            weekly_dup = await asyncio.to_thread(
+                ActivityRecord.has_group_activity_within_days,
+                user_id,
+                group_key,
+                date_iso,
+                7,
+            )
+            if weekly_dup:
+                await interaction.response.send_message(
+                    "❌ You already recorded a weekly version of that activity in the last 7 days.",
+                    ephemeral=True,
+                )
+                return
+
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=True)
 
