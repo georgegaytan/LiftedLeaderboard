@@ -20,7 +20,9 @@ from src.utils.helper import level_to_rank
 
 logger = logging.getLogger(__name__)
 
-
+# =========================================================
+# Caching
+# =========================================================
 class _CategoryCache(TypedDict):
     expires_at: float
     data: list[str]
@@ -32,106 +34,119 @@ class _ActivityCacheEntry(TypedDict):
 
 
 _CACHE_TTL_SECONDS = 604800  # 1 week
-_category_cache: _CategoryCache = {'expires_at': 0.0, 'data': []}
+_category_cache: _CategoryCache = {"expires_at": 0.0, "data": []}
 _activity_cache: dict[str, _ActivityCacheEntry] = {}
 _activity_cache_warmed = False
 
 
+async def _get_categories_cached(now: float) -> list[str]:
+    if _category_cache["data"] and _category_cache["expires_at"] > now:
+        return _category_cache["data"]
+
+    categories = await asyncio.to_thread(Activity.list_categories, active_only=True)
+    _category_cache.update({"data": categories, "expires_at": now + _CACHE_TTL_SECONDS})
+    return categories
+
+
+async def _get_activities_cached(category: str, now: float) -> list[str]:
+    entry = _activity_cache.get(category)
+    if entry and entry["expires_at"] > now:
+        return entry["data"]
+
+    rows = await asyncio.to_thread(Activity.list_by_category, category, active_only=True)
+    names = [a["name"] for a in rows]
+    _activity_cache[category] = {"data": names, "expires_at": now + _CACHE_TTL_SECONDS}
+    return names
+
+
 async def _warm_activity_cache_if_needed(now: float) -> None:
     global _activity_cache_warmed
-
     if _activity_cache_warmed:
         return
 
-    # Reuse category cache if valid, otherwise hit DB
-    cat_cache = _category_cache
-    if cat_cache['data'] and cat_cache['expires_at'] > now:
-        categories = cat_cache['data']
-    else:
-        categories = await asyncio.to_thread(Activity.list_categories, active_only=True)
-        cat_cache['data'] = categories
-        cat_cache['expires_at'] = now + _CACHE_TTL_SECONDS
-
+    categories = await _get_categories_cached(now)
     for cat in categories:
         try:
-            rows_all = await asyncio.to_thread(
-                Activity.list_by_category, cat, active_only=True
-            )
-            all_names = [a['name'] for a in rows_all]
-            _activity_cache[cat] = {
-                'data': all_names,
-                'expires_at': now + _CACHE_TTL_SECONDS,
-            }
+            await _get_activities_cached(cat, now)
         except Exception:
-            # Best-effort warming; skip errors for individual categories
-            continue
+            logger.debug("Failed warming cache for category %s", cat)
 
     _activity_cache_warmed = True
 
 
+# =========================================================
+# Helpers
+# =========================================================
+def _parse_activity_date(date_input: str | None) -> date:
+    """Parse user-provided date string into a date object."""
+    if not date_input:
+        return datetime.now(timezone.utc).date()
+
+    cleaned = date_input.strip().lower()
+
+    if cleaned == "yesterday":
+        return pendulum.yesterday().date()
+
+    try:
+        return pendulum.parse(cleaned, strict=False).date()
+    except Exception as e:
+        logger.debug("Date parse failed for '%s': %s", date_input, e)
+        raise ValueError
+
+
+def _format_achievement_lines(unlocked: list[dict]) -> list[str]:
+    unique = {a.get("code"): a for a in unlocked}.values()
+    lines = ["\n🏆 Achievements unlocked:"]
+    for a in unique:
+        lines.append(
+            f"- **{a.get('name', 'Achievement')}** (+{int(a.get('xp_value', 0))} XP)\n"
+            f"  _{a.get('description', '')}_"
+        )
+    return lines
+
+
+def _level_audio_file(rank_changed: bool) -> pathlib.Path:
+    base = pathlib.Path(__file__).resolve().parents[1]
+    name = "rank_up.ogg" if rank_changed else "level_up.ogg"
+    return base / "assets" / "audio" / name
+
+
+# =========================================================
+# Cogs
+# =========================================================
 class ActivityRecordsCog(commands.Cog):
     def __init__(self, bot: commands.Bot):
         self.bot = bot
 
-    # Autocomplete for category
-    async def category_autocomplete(self, interaction: Interaction, current: str):
-        '''Autocomplete available categories from the DB.'''
-        # Filter client-side after fetching limited categories
-        now = perf_counter()
-        cache = _category_cache
-        categories: list[str]
-        if cache['data'] and cache['expires_at'] > now:
-            categories = cache['data']  # type: ignore[assignment]
-            logger.info(f'Using cached categories {categories}')
-        else:
-            categories = await asyncio.to_thread(
-                Activity.list_categories, active_only=True
-            )
-            cache['data'] = categories
-            cache['expires_at'] = now + _CACHE_TTL_SECONDS
-        cur = (current or '').lower()
-        filtered = [c for c in categories if cur in c.lower()]
-        return [app_commands.Choice(name=c, value=c) for c in filtered]
+    # ---------------- Autocomplete ----------------
 
-    # Autocomplete for activity based on selected category
+    async def category_autocomplete(self, interaction: Interaction, current: str):
+        now = perf_counter()
+        categories = await _get_categories_cached(now)
+        cur = (current or "").lower()
+        return [
+            app_commands.Choice(name=c, value=c)
+            for c in categories
+            if cur in c.lower()
+        ]
+
     async def activity_autocomplete(self, interaction: Interaction, current: str):
-        '''Autocomplete activity names within the selected category.'''
         category = interaction.namespace.category
         if not category:
-            return []  # No category selected yet
+            return []
 
         now = perf_counter()
         await _warm_activity_cache_if_needed(now)
+        names = await _get_activities_cached(category, now)
 
-        entry = _activity_cache.get(category)
-        names: list[str]
-        if entry and entry.get('data') and entry.get('expires_at', 0.0) > now:
-            names = entry['data']  # type: ignore[assignment]
-            logger.info(f'Using cached activities {names}')
-        else:
-            rows = await asyncio.to_thread(
-                Activity.list_by_category, category, active_only=True
-            )
-            names = [a['name'] for a in rows]
-            _activity_cache[category] = {
-                'data': names,
-                'expires_at': now + _CACHE_TTL_SECONDS,
-            }
-        cur = (current or '').lower()
-        filtered = [n for n in names if cur in n.lower()]
-        return [app_commands.Choice(name=n, value=n) for n in filtered]
+        cur = (current or "").lower()
+        return [app_commands.Choice(name=n, value=n) for n in names if cur in n.lower()]
 
-    # Command: /record
-    @app_commands.command(name='record', description='Record an activity to earn XP')
-    @app_commands.describe(
-        category='Choose the category of activity (e.g., Running, Swimming, etc.)',
-        activity='Select the specific activity',
-        note='Optional note about your session',
-        date_occurred='When the activity occurred i.e. YYYY-MM-DD (default: today)',
-    )
-    @app_commands.autocomplete(
-        category=category_autocomplete, activity=activity_autocomplete
-    )
+    # =========================================================
+    # /record
+    # =========================================================
+    @app_commands.command(name="record", description="Record an activity to earn XP")
+    @app_commands.autocomplete(category=category_autocomplete, activity=activity_autocomplete)
     async def record(
         self,
         interaction: Interaction,
@@ -140,50 +155,32 @@ class ActivityRecordsCog(commands.Cog):
         note: str | None = None,
         date_occurred: str | None = None,
     ):
-        '''Record an activity and automatically award XP.'''
-        user_id = interaction.user.id
-        display_name = interaction.user.display_name
-        date_occurred = date_occurred or date.today().isoformat()
+        user = interaction.user
+        user_id = user.id
+        display_name = user.display_name
         t0 = perf_counter()
 
         try:
-            date_obj = pendulum.parse(date_occurred, strict=False)
-            if not date_obj:
-                raise ValueError('Could not parse date')
-            date_obj = date_obj.date()  # Convert to date object for consistency
-        except Exception as e:
-            logger.debug(f'Failed to parse date "{date_occurred}": {e}')
+            date_obj = _parse_activity_date(date_occurred)
+        except ValueError:
             await interaction.response.send_message(
-                '❌ Invalid date format. '
-                'Try formats like: YYYY-MM-DD, MM/DD/YYYY, or "yesterday"',
+                "❌ Invalid date format. Try YYYY-MM-DD, MM/DD/YYYY, or 'yesterday'",
                 ephemeral=True,
             )
             return
 
-        # Ensure user exists
-        await asyncio.to_thread(User.upsert_user, user_id, display_name)
-        # Convert to ISO format string for consistency
-        date_occurred_isoformat: str = date_obj.isoformat()
+        date_iso = date_obj.isoformat()
+        today_iso = datetime.now(timezone.utc).date().isoformat()
 
-        # Capture pre-change level and rank
+        await asyncio.to_thread(User.upsert_user, user_id, display_name)
+
         before_profile = await asyncio.to_thread(User.get_profile, user_id)
-        old_level = int(before_profile['level']) if before_profile else 1
+        old_level = int(before_profile["level"]) if before_profile else 1
         old_rank = level_to_rank(old_level)
 
-        # Daily bonus check (first record today)
-        today_isoformat = datetime.now(timezone.utc).date().isoformat()
-        check_bonus = not await asyncio.to_thread(
-            ActivityRecord.has_record_on_date, user_id, today_isoformat
-        )
-
-        # Lookup activity
         activity_row = await asyncio.to_thread(
-            Activity.get_by_name_category,
-            activity,
-            category,
-            active_only=True,
+            Activity.get_by_name_category, activity, category, active_only=True
         )
-
         if not activity_row:
             await interaction.response.send_message(
                 f'❌ Activity "{activity}" not found in category "{category}".',
@@ -191,146 +188,148 @@ class ActivityRecordsCog(commands.Cog):
             )
             return
 
-        activity_id = activity_row['id']
+        xp_value = int(activity_row["xp_value"])
+        activity_id = activity_row["id"]
 
-        # Record the activity
-        t_before_insert = perf_counter()
+        # Duplicate validation
+        activity_name = str(activity_row.get("name", activity))
+        group_key = ActivityRecord._activity_group_key(category, activity_name)
+        if group_key == "steps_daily":
+            dup = await asyncio.to_thread(
+                ActivityRecord.has_group_activity_on_date,
+                user_id,
+                group_key,
+                date_iso,
+            )
+            if dup:
+                await interaction.response.send_message(
+                    "❌ You already recorded a Daily Steps activity for that day.",
+                    ephemeral=True,
+                )
+                return
+        else:
+            dup = await asyncio.to_thread(
+                ActivityRecord.has_activity_on_date,
+                user_id,
+                activity_id,
+                date_iso,
+            )
+            if dup:
+                await interaction.response.send_message(
+                    "❌ You already recorded that activity for that day.",
+                    ephemeral=True,
+                )
+                return
+
+        if group_key in {
+            "steps_weekly",
+            "recovery_weekly_sleep",
+            "diet_weekly_no_alcohol",
+        }:
+            weekly_dup = await asyncio.to_thread(
+                ActivityRecord.has_group_activity_within_days,
+                user_id,
+                group_key,
+                date_iso,
+                7,
+            )
+            if weekly_dup:
+                await interaction.response.send_message(
+                    "❌ You already recorded a weekly version of that activity in the last 7 days.",
+                    ephemeral=True,
+                )
+                return
+
         if not interaction.response.is_done():
             await interaction.response.defer(thinking=True)
 
-        # Send initial message and create record
-        initial_message = await interaction.followup.send(
-            '⏳ Recording your activity...', wait=True
-        )
+        status_msg = await interaction.followup.send("⏳ Recording your activity...", wait=True)
 
-        # Create the activity record
         await asyncio.to_thread(
             ActivityRecord.insert,
             user_id=user_id,
             activity_id=activity_id,
             note=note,
-            date_occurred=date_occurred_isoformat,
-            message_id=initial_message.id,
+            date_occurred=date_iso,
+            message_id=status_msg.id,
         )
-        t_after_insert = perf_counter()
 
-        # Build the success message
-        message = f'✅ Recorded: **{activity}** (+{activity_row["xp_value"]} XP)'
-        message += f'\n📂 Category: {category}'
+        message_lines = [
+            f"✅ Recorded: **{activity}** (+{xp_value} XP)",
+            f"📂 Category: {category}",
+        ]
         if note:
-            message += f'\n📝 _{note}_'
-        if date_occurred_isoformat != today_isoformat:
-            message += f'\n📅 Date: {date_occurred_isoformat}'
+            message_lines.append(f"📝 _{note}_")
+        if date_iso != today_iso:
+            message_lines.append(f"📅 Date: {date_iso}")
 
-        # Track achievements unlocked during this command
-        unlocked: list[dict] = []
-
-        # Apply daily bonus after successful record
-        if check_bonus:
-            await asyncio.to_thread(User.add_daily_bonus, user_id)
-            message += '\n🎁 Daily bonus: +10 XP'
-
-        t_done = perf_counter()
-        logger.info(
-            f'/record timings: total={t_done - t0:.3f}s, '
-            f'before_insert={t_before_insert - t0:.3f}s, '
-            f'insert_block={t_after_insert - t_before_insert:.3f}s, '
-            f'daily_bonus={t_done - t_after_insert:.3f}s'
+        # Daily bonus
+        has_today = await asyncio.to_thread(
+            ActivityRecord.has_record_on_date, user_id, today_iso
         )
+        if not has_today:
+            await asyncio.to_thread(User.add_daily_bonus, user_id)
+            message_lines.append("🎁 Daily bonus: +10 XP")
 
-        # Dispatch achievement event: activity recorded
+        unlocked: list[dict] = []
         try:
-            activity_category = activity_row['category']
             unlocked += engine.dispatch(
                 ActivityRecordedEvent(
                     user_id=user_id,
                     activity_id=activity_id,
-                    category=activity_category,
-                    date_occurred=date.fromisoformat(date_occurred_isoformat),
+                    category=activity_row["category"],
+                    date_occurred=date_obj,
                 )
             )
         except Exception:
-            pass
+            logger.exception("ActivityRecordedEvent dispatch failed")
 
-        # Capture post-change level and rank and append notifications
         after_profile = await asyncio.to_thread(User.get_profile, user_id)
         files: list[discord.File] = []
-        if after_profile and 'level' in after_profile:
-            new_level = int(after_profile['level'])
+
+        if after_profile and "level" in after_profile:
+            new_level = int(after_profile["level"])
             new_rank = level_to_rank(new_level)
-            rank_changed = new_rank != old_rank
-            level_changed = new_level > old_level
 
-            if level_changed:
-                message += f'\n🎉 Level up! Level {old_level} → {new_level}'
-            if rank_changed:
-                message += f'\n🏅 Rank up! {old_rank} → {new_rank}'
+            if new_level > old_level:
+                message_lines.append(f"🎉 Level up! Level {old_level} → {new_level}")
 
+            if new_rank != old_rank:
+                message_lines.append(f"🏅 Rank up! {old_rank} → {new_rank}")
                 try:
                     unlocked += engine.dispatch(
-                        RankChangedEvent(
-                            user_id=user_id,
-                            new_rank=new_rank,
-                        )
+                        RankChangedEvent(user_id=user_id, new_rank=new_rank)
                     )
-                except Exception as e:
-                    logger.exception(f'Failed to dispatch level changed event: {e}')
+                except Exception:
+                    logger.exception("RankChangedEvent dispatch failed")
 
-            if rank_changed or level_changed:
-                base = pathlib.Path(__file__).resolve().parents[1]  # points to src/
-                audio_dir = base / 'assets' / 'audio'
-                audio_path = audio_dir / (
-                    'rank_up.ogg' if rank_changed else 'level_up.ogg'
-                )
+            if new_rank != old_rank or new_level > old_level:
+                audio_path = _level_audio_file(new_rank != old_rank)
                 if audio_path.exists():
-                    try:
-                        files.append(
-                            discord.File(str(audio_path), filename=audio_path.name)
-                        )
-                    except Exception:
-                        pass  # Non-fatal: if file cannot attach, still send the message
+                    files.append(discord.File(str(audio_path), filename=audio_path.name))
 
-        # Append unlocked achievements summary
         if unlocked:
-            unique = {}
-            for a in unlocked:
-                unique[a.get('code')] = a
-            lines = [
-                f'- {a.get("name", "Achievement")} (+{int(a.get("xp_value", 0))} XP) \n'
-                f'- _{a.get("description", "Achievement Description")}_'
-                for a in unique.values()
-            ]
-            message += '\n\n🏆 Achievements unlocked:\n' + '\n'.join(lines)
+            message_lines.extend(_format_achievement_lines(unlocked))
 
-        # Edit the initial message with the final content
+        logger.info(" /record completed in %.3fs", perf_counter() - t0)
+
+        final_message = "\n".join(message_lines)
         try:
             if files:
-                await initial_message.edit(content=message, files=files)
+                await status_msg.edit(content=final_message, attachments=files)
             else:
-                await initial_message.edit(content=message)
-        except Exception as e:
-            logger.error(f'Failed to edit message: {e}')
-            # Fallback to sending a new message if editing fails
+                await status_msg.edit(content=final_message)
+        except Exception:
+            logger.exception("Failed editing message, sending fallback")
             if files:
-                await interaction.followup.send(content=message, files=files)
+                await interaction.followup.send(content=final_message, files=files)
             else:
-                await interaction.followup.send(message)
+                await interaction.followup.send(content=final_message)
 
-    @app_commands.command(
-        name='recent', description='View and edit your recent activity records'
-    )
-    @app_commands.describe(
-        limit='How many records to show (default 5, max 50)',
-        sort_by='How to sort records: '
-        '"Date Occurred" (default), "Date Created", or "Date Updated"',
-    )
-    @app_commands.choices(
-        sort_by=[
-            app_commands.Choice(name='Recently Occurred', value='occurred'),
-            app_commands.Choice(name='Recently Created', value='created'),
-            app_commands.Choice(name='Recently Updated', value='updated'),
-        ]
-    )
+    # =========================================================
+    # /recent
+    # =========================================================
+    @app_commands.command(name="recent", description="View and edit your recent activity records")
     async def recent(
         self,
         interaction: Interaction,
@@ -338,70 +337,39 @@ class ActivityRecordsCog(commands.Cog):
         sort_by: app_commands.Choice[str] | None = None,
     ):
         user_id = interaction.user.id
-        lim = max(1, min(50, limit or 5))
-        sort_mode = (sort_by.value if sort_by else 'occurred').lower()
-        rows = ActivityRecord.recent_for_user(
-            user_id=user_id, limit=lim, sort=sort_mode  # type: ignore[arg-type]
-        )
+        lim = max(1, min(50, limit))
+        sort_mode = (sort_by.value if sort_by else "occurred").lower()
+
+        rows = ActivityRecord.recent_for_user(user_id=user_id, limit=lim, sort=sort_mode)
 
         if not rows:
-            await interaction.response.send_message(
-                'No recent records found.',
-                ephemeral=True,
-            )
+            await interaction.response.send_message("No recent records found.", ephemeral=True)
             return
 
         title_map = {
-            'occurred': 'Recently Occurred',
-            'created': 'Recently Created',
-            'updated': 'Recently Updated',
+            "occurred": "Recently Occurred",
+            "created": "Recently Created",
+            "updated": "Recently Updated",
         }
-        title_sort = title_map.get(sort_mode, 'Recently Occurred')
 
         embed = discord.Embed(
-            title=f'{title_sort} Activity Records (showing {len(rows)})',
+            title=f'{title_map.get(sort_mode)} Activity Records (showing {len(rows)})',
             color=discord.Color.blurple(),
         )
 
         for idx, r in enumerate(rows, start=1):
             label = f'{idx}. {r["activity_name"]} · {r["category"]}'
-
             details = f'📅 {r["date_occurred"]}  •  +{r["xp_value"]} XP'
-            if sort_mode == 'updated' and r['updated_at']:
-                details += f'\n🕓 Updated: {r["updated_at"]}'
-            elif sort_mode == 'created' and r['created_at']:
-                details += f'\n🕓 Created: {r["created_at"]}'
 
-            if r['note']:
+            if r["note"]:
                 details += f'\n📝 {r["note"]}'
 
             embed.add_field(name=label, value=details, inline=False)
 
         view = RecentRecordsView(requestor_id=user_id, records=rows)
 
-        if interaction.message and interaction.message.reference:
-            try:
-                # Try to get the referenced message
-                reference_message = await interaction.channel.fetch_message(
-                    interaction.message.reference.message_id
-                )
-                if reference_message and reference_message.author == self.bot.user:
-                    # Edit the referenced message if it's from the bot
-                    await reference_message.edit(embed=embed, view=view)
-                    await interaction.response.send_message(
-                        '✅ Updated the activity record.', ephemeral=True, delete_after=5
-                    )
-                    return
-            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
-                pass  # Fall through to normal behavior
-
-        # If not a reply or couldn't edit the referenced message, send a new one
         if not interaction.response.is_done():
-            await interaction.response.send_message(
-                embed=embed,
-                view=view,
-                ephemeral=True,
-            )
+            await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
 
 async def setup(bot: commands.Bot):
