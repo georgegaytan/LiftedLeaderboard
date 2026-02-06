@@ -49,10 +49,10 @@ class ActivityRecordsCog(commands.Cog):
     # Command: /record
     @app_commands.command(name='record', description='Record an activity to earn XP')
     @app_commands.describe(
-        category='Activity category (e.g., Fitness, Learning)',
+        category='Activity Category (i.e. Running, Swimming, etc.)',
         activity='Specific activity name',
         note='Optional note about this activity',
-        date_occurred='Date the activity occurred (default: today)',
+        date_occurred='Date the activity occurred i.e. YYYY-MM-DD (default: today)',
     )
     @app_commands.autocomplete(
         category=category_autocomplete, activity=activity_autocomplete
