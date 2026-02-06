@@ -12,6 +12,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
 
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+
     steps:
       - uses: actions/checkout@v4
 
@@ -27,4 +30,4 @@ jobs:
 
       - name: Run tests
         run: |
-          pytest
+          pytest --import-mode=prepend
