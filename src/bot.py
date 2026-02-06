@@ -8,6 +8,7 @@ from discord.ext import commands
 
 from src.database.db_manager import DBManager
 from src.utils.env import load_env
+from src.utils.tracing import trace_span
 
 # Logging setup
 logging.basicConfig(
@@ -29,44 +30,49 @@ class LiftedLeaderboardBot(commands.Bot):
         super().__init__(command_prefix='/', intents=get_intents())
 
     async def setup_hook(self):
-        cogs_path = pathlib.Path(__file__).parent / 'cogs'
-        for file in cogs_path.glob('*_cog.py'):
-            module = f'src.cogs.{file.stem}'
-            try:
-                await self.load_extension(module)
-                logger.info(f'Loaded {module}')
-            except Exception:
-                logger.error(f'Failed to load {module}', exc_info=True)
+        with trace_span('bot.cog_loading'):
+            cogs_path = pathlib.Path(__file__).parent / 'cogs'
+            for file in cogs_path.glob('*_cog.py'):
+                module = f'src.cogs.{file.stem}'
+                try:
+                    await self.load_extension(module)
+                    logger.info(f'Loaded {module}')
+                except Exception:
+                    logger.error(f'Failed to load {module}', exc_info=True)
 
     async def on_ready(self):
-        guild_id = os.getenv('GUILD_ID')
-        if not guild_id:
-            raise RuntimeError('GUILD_ID not set in environment or .env')
+        with trace_span('bot.command_sync'):
+            guild_id = os.getenv('GUILD_ID')
+            if not guild_id:
+                raise RuntimeError('GUILD_ID not set in environment or .env')
 
-        guild = discord.Object(id=int(guild_id))
-        self.tree.copy_global_to(guild=guild)
-        await self.tree.sync(guild=guild)
-        logger.info(f'Bot ready! Synced commands to guild {guild_id}')
+            guild = discord.Object(id=int(guild_id))
+            self.tree.copy_global_to(guild=guild)
+            await self.tree.sync(guild=guild)
+            logger.info(f'Bot ready! Synced commands to guild {guild_id}')
 
 
 async def main():
-    load_env()
-    token = os.getenv('DISCORD_TOKEN')
-    if not token:
-        raise RuntimeError('DISCORD_TOKEN not set in environment or .env')
+    with trace_span('bot.startup'):
+        load_env()
+        token = os.getenv('DISCORD_TOKEN')
+        if not token:
+            raise RuntimeError('DISCORD_TOKEN not set in environment or .env')
 
-    # Initialize the Postgres connection pool once for the process
-    DBManager.init_pool()
+        # Initialize the Postgres connection pool once for the process
+        with trace_span('bot.db_pool_init'):
+            DBManager.init_pool()
 
-    bot = LiftedLeaderboardBot()
-    try:
-        async with bot:
-            await bot.start(token)
-    except Exception:
-        logger.error('Bot failed due to an exception', exc_info=True)
-    finally:
-        # Ensure DB connections are cleaned up on shutdown
-        DBManager.close_pool()
+        bot = LiftedLeaderboardBot()
+        try:
+            async with bot:
+                await bot.start(token)
+        except Exception:
+            logger.error('Bot failed due to an exception', exc_info=True)
+        finally:
+            # Ensure DB connections are cleaned up on shutdown
+            with trace_span('bot.db_pool_close'):
+                DBManager.close_pool()
 
 
 if __name__ == '__main__':
