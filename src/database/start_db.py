@@ -14,14 +14,12 @@ def run(db: DBManager):
     init_schema_pg(db)
     logger.info('Postgres database and tables created/verified.')
     # Verify tables (Postgres)
-    tables = db.fetchall(
-        '''
+    tables = db.fetchall('''
         SELECT tablename AS name
         FROM pg_catalog.pg_tables
         WHERE schemaname = 'public'
         ORDER BY tablename
-        '''
-    )
+        ''')
     logger.info(f"Current tables in DB: {[t['name'] for t in tables]}")
 
     # Step 3: Run migrations

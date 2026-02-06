@@ -37,25 +37,25 @@ HEALTH_FACTS = [
 ]
 
 INSPIRATIONAL_QUOTES = [
-    '"The more you seek the uncomfortable, the more you will become comfortable" - Conor McGregor 💀', # noqa: E501
-    '“Discipline equals freedom.” - Jocko Willink', # noqa: E501
-    '“Don\'t count the days, make the days count.” - Muhammad Ali', # noqa: E501
-    '"Once a mistake, twice a decision." - Paulo Coelho', # noqa: E501
-    '"Josh Gordon." - George', # noqa: E501
-    '"When a man has a need, he must get it." - Nguyen', # noqa: E501
-    '“Strength does not come from the body. It comes from the will.” - Mahatma Gandhi', # noqa: E501
-    '“Pain is temporary. Quitting lasts forever.” - Lance Armstrong 💉', # noqa: E501
-    '“When you are tired, learn to rest, not quit.” - Banksy', # noqa: E501
-    '“Discipline is choosing between what you want now and what you want most.” - Abraham LinclonFF', # noqa: E501
-    '"Fall down 7 times, get up 8." - Japanese Proverb', # noqa: E501
-    '"Lift heavy, work hard, get plenty of sleep, and eat right." - Ronnie Coleman', # noqa: E501
-    '“The secret of getting ahead is getting started. The secret of lasting is pacing yourself.” - Mark Twain', # noqa: E501
-    '“Recovery is as important as the workout itself.” - Greg Glassman', # noqa: E501
-    '"The only bad workout is the one that didn\'t happen." - Sam Sulek', # noqa: E501
-    '"You don’t have to be extreme, just consistent." - Sam Sulek', # noqa: E501
-    '"Fitness is not about being better than someone else. It’s about being better than you used to be." - Sam Sulek', # noqa: E501
-    '"The person who enjoys walking, will walk further than the person who enjoys the destination." - Sam Sulek', # noqa: E501
-    '"You’re not them and you’re not supposed to be. It’s you vs who you were yesterday." - Sam Sulek', # noqa: E501
+    '"The more you seek the uncomfortable, the more you will become comfortable" - Conor McGregor 💀',  # noqa: E501
+    '“Discipline equals freedom.” - Jocko Willink',  # noqa: E501
+    '“Don’t count the days, make the days count.” - Muhammad Ali',  # noqa: E501
+    '"Once a mistake, twice a decision." - Paulo Coelho',  # noqa: E501
+    '"Josh Gordon." - George',  # noqa: E501
+    '"When a man has a need, he must get it." - Nguyen',  # noqa: E501
+    '“Strength does not come from the body. It comes from the will.” - Mahatma Gandhi',  # noqa: E501
+    '“Pain is temporary. Quitting lasts forever.” - Lance Armstrong 💉',  # noqa: E501
+    '“When you are tired, learn to rest, not quit.” - Banksy',  # noqa: E501
+    '“Discipline is choosing between what you want now and what you want most.” - Abraham LinclonFF',  # noqa: E501
+    '"Fall down 7 times, get up 8." - Japanese Proverb',  # noqa: E501
+    '"Lift heavy, work hard, get plenty of sleep, and eat right." - Ronnie Coleman',  # noqa: E501
+    '“The secret of getting ahead is getting started. The secret of lasting is pacing yourself.” - Mark Twain',  # noqa: E501
+    '“Recovery is as important as the workout itself.” - Greg Glassman',  # noqa: E501
+    '"The only bad workout is the one that didn\'t happen." - Sam Sulek',  # noqa: E501
+    '"You don’t have to be extreme, just consistent." - Sam Sulek',  # noqa: E501
+    '"Fitness is not about being better than someone else. It’s about being better than you used to be." - Sam Sulek',  # noqa: E501
+    '"The person who enjoys walking, will walk further than the person who enjoys the destination." - Sam Sulek',  # noqa: E501
+    '"You’re not them and you’re not supposed to be. It’s you vs who you were yesterday." - Sam Sulek',  # noqa: E501
 ]
 
 RANKS = [

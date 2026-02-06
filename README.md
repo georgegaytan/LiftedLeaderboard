@@ -50,7 +50,7 @@ LiftedLeaderboard/
 
 ## Requirements
 
-- **Python**: 3.11+
+- **Python**: 3.14+
 - **PostgreSQL**: Managed instance (e.g., Neon or local). SSL recommended.
 - **psycopg**: `psycopg[binary,pool]`
 

@@ -12,8 +12,7 @@ def up(db_manager: DBManager):
     db_manager.execute('DROP INDEX IF EXISTS idx_activity_records_activity_id')
 
     # Update Award XP TRIGGER to not call redundant updated_at = NOW()
-    db_manager.execute(
-        '''
+    db_manager.execute('''
         CREATE OR REPLACE FUNCTION award_activity_xp_fn()
         RETURNS TRIGGER AS $$
         DECLARE
@@ -32,8 +31,7 @@ def up(db_manager: DBManager):
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
-        '''
-    )
+        ''')
 
 
 def down(db_manager: DBManager):
@@ -41,28 +39,21 @@ def down(db_manager: DBManager):
     db_manager.execute('SET synchronous_commit = on')
 
     # Recreate previously dropped indexes
-    db_manager.execute(
-        '''
+    db_manager.execute('''
         CREATE INDEX IF NOT EXISTS idx_activity_records_updated_at
         ON activity_records(updated_at)
-        '''
-    )
-    db_manager.execute(
-        '''
+        ''')
+    db_manager.execute('''
         CREATE INDEX IF NOT EXISTS idx_activity_records_created_at
         ON activity_records(created_at)
-        '''
-    )
-    db_manager.execute(
-        '''
+        ''')
+    db_manager.execute('''
         CREATE INDEX IF NOT EXISTS idx_activity_records_activity_id
         ON activity_records(activity_id)
-        '''
-    )
+        ''')
 
     # Restore the original Award XP trigger function (with updated_at assignment)
-    db_manager.execute(
-        '''
+    db_manager.execute('''
         CREATE OR REPLACE FUNCTION award_activity_xp_fn()
         RETURNS TRIGGER AS $$
         DECLARE
@@ -81,8 +72,7 @@ def down(db_manager: DBManager):
             RETURN NEW;
         END;
         $$ LANGUAGE plpgsql;
-        '''
-    )
+        ''')
 
 
 def main():

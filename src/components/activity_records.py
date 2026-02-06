@@ -241,6 +241,56 @@ class RecordEditModal(discord.ui.Modal):
             return
 
         # Update the record in the database
+        group_key = ActivityRecord._activity_group_key(
+            self.staged_category, self.staged_activity_name
+        )
+        if group_key == 'steps_daily':
+            dup = ActivityRecord.has_group_activity_on_date(
+                user_id=record['user_id'],
+                group_key=group_key,
+                date_iso=date_val,
+                exclude_record_id=self.record_id,
+            )
+            if dup:
+                await interaction.response.send_message(
+                    '❌ You already recorded a Daily Steps activity for that day.',
+                    ephemeral=True,
+                )
+                return
+        else:
+            dup = ActivityRecord.has_activity_on_date(
+                user_id=record['user_id'],
+                activity_id=self.staged_activity_id,
+                date_iso=date_val,
+                exclude_record_id=self.record_id,
+            )
+            if dup:
+                await interaction.response.send_message(
+                    '❌ You already recorded that activity for that day.',
+                    ephemeral=True,
+                )
+                return
+
+        if group_key in {
+            'steps_weekly',
+            'recovery_weekly_sleep',
+            'diet_weekly_no_alcohol',
+        }:
+            weekly_dup = ActivityRecord.has_group_activity_within_days(
+                user_id=record['user_id'],
+                group_key=group_key,
+                date_iso=date_val,
+                days=7,
+                exclude_record_id=self.record_id,
+            )
+            if weekly_dup:
+                await interaction.response.send_message(
+                    '❌ You already recorded a weekly version of that '
+                    'activity in the last 7 days.',
+                    ephemeral=True,
+                )
+                return
+
         ActivityRecord.update_record(
             record_id=self.record_id,
             activity_id=self.staged_activity_id,
@@ -448,8 +498,10 @@ class ContinueButton(discord.ui.Button):
             current_date=v.current_date,
             parent_view=v,
             original_message_id=v.message_id,  # Use the stored message_id
-            original_channel_id=getattr(interaction.channel, 'id', None)
-            if interaction.channel
-            else None,
+            original_channel_id=(
+                getattr(interaction.channel, 'id', None)
+                if interaction.channel
+                else None
+            ),
         )
         await interaction.response.send_modal(modal)

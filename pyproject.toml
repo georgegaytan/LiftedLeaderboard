@@ -1,6 +1,6 @@
 [tool.black]
 line-length = 88
-target-version = ['py312']
+target-version = ['py314']
 include = '\.pyi?$'
 skip-string-normalization = true
 extend-exclude = '''
@@ -38,7 +38,7 @@ exclude = [
 ]
 
 [tool.mypy]
-python_version = "3.13"
+python_version = "3.14"
 warn_return_any = true
 warn_unused_configs = true
 disallow_untyped_defs = false

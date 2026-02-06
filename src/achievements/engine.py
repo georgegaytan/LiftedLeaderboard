@@ -77,7 +77,7 @@ class AchievementsEngine:
                                 }
                             )
 
-                            # PostAward DB trigger may have increased xp and updated lvl
+                            # Post-award: DB trigger may have increased xp & updated lvl
                             try:
                                 after_profile = User.get_profile(event.user_id)
                                 if after_profile and 'level' in after_profile:
