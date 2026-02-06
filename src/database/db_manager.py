@@ -3,6 +3,8 @@ import os
 from functools import wraps
 from typing import Any, Callable, Iterable, List, Optional, Sequence, Tuple, TypeVar
 
+from src.utils.tracing import trace_span
+
 T = TypeVar('T')
 
 logger = logging.getLogger(__name__)
@@ -201,53 +203,84 @@ class DBManager:
     @require_connection
     def execute(self, query: str, params: Iterable[Any] | None = None) -> None:
         '''Execute a single SQL statement.'''
-        try:
-            self._run_with_retry(lambda: self._exec_pg(query, params))
-        except Exception as e:
-            logger.error(
-                f'Postgres execute() error: {e}\nQuery: {query}\nParams: {params}'
-            )
-            raise
+        with trace_span(
+            'database.execute',
+            {
+                'operation': 'execute',
+                'query_type': query.strip().split()[0].upper() if query else 'unknown',
+            },
+        ):
+            try:
+                self._run_with_retry(lambda: self._exec_pg(query, params))
+            except Exception as e:
+                logger.error(
+                    f'Postgres execute() error: {e}\nQuery: {query}\nParams: {params}'
+                )
+                raise
 
     @require_connection
     def executemany(self, query: str, param_list: Iterable[Sequence[Any]]) -> None:
         '''Execute a SQL statement against a sequence of parameter sets.'''
+        param_count = len(list(param_list)) if param_list else 0
 
-        def _do() -> None:
-            assert self._pg_conn is not None
-            with self._pg_conn.cursor() as cur:
-                cur.executemany(query, list(param_list))
+        with trace_span(
+            'database.executemany',
+            {
+                'operation': 'executemany',
+                'query_type': query.strip().split()[0].upper() if query else 'unknown',
+                'param_count': param_count,
+            },
+        ):
 
-        try:
-            self._run_with_retry(_do)
-        except Exception as e:
-            logger.error(f'Postgres executemany() error: {e}\nQuery: {query}')
-            raise
+            def _do() -> None:
+                assert self._pg_conn is not None
+                with self._pg_conn.cursor() as cur:
+                    cur.executemany(query, list(param_list))
+
+            try:
+                self._run_with_retry(_do)
+            except Exception as e:
+                logger.error(f'Postgres executemany() error: {e}\nQuery: {query}')
+                raise
 
     @require_connection
     def fetchall(
         self, query: str, params: Iterable[Any] | None = None
     ) -> List[dict[str, Any]]:
         '''Return all rows as a list of dictionaries.'''
-        try:
-            rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
-            return rows
-        except Exception as e:
-            logger.error(
-                f'Postgres fetchall() error: {e}\nQuery: {query}\nParams: {params}'
-            )
-            raise
+        with trace_span(
+            'database.fetchall',
+            {
+                'operation': 'fetchall',
+                'query_type': query.strip().split()[0].upper() if query else 'unknown',
+            },
+        ):
+            try:
+                rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
+                return rows
+            except Exception as e:
+                logger.error(
+                    f'Postgres fetchall() error: {e}\nQuery: {query}\nParams: {params}'
+                )
+                raise
 
     @require_connection
     def fetchone(
         self, query: str, params: Iterable[Any] | None = None
     ) -> Optional[dict[str, Any]]:
         '''Return a single row as a dictionary, or None if no result.'''
-        try:
-            rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
-            return rows[0] if rows else None
-        except Exception as e:
-            logger.error(
-                f'Postgres fetchone() error: {e}\nQuery: {query}\nParams: {params}'
-            )
-            raise
+        with trace_span(
+            'database.fetchone',
+            {
+                'operation': 'fetchone',
+                'query_type': query.strip().split()[0].upper() if query else 'unknown',
+            },
+        ):
+            try:
+                rows, _ = self._run_with_retry(lambda: self._select_pg(query, params))
+                return rows[0] if rows else None
+            except Exception as e:
+                logger.error(
+                    f'Postgres fetchone() error: {e}\nQuery: {query}\nParams: {params}'
+                )
+                raise

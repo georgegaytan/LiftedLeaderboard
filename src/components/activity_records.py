@@ -285,7 +285,8 @@ class RecordEditModal(discord.ui.Modal):
             )
             if weekly_dup:
                 await interaction.response.send_message(
-                    '❌ You already recorded a weekly version of that activity in the last 7 days.',
+                    '❌ You already recorded a weekly version of that '
+                    'activity in the last 7 days.',
                     ephemeral=True,
                 )
                 return
@@ -497,8 +498,10 @@ class ContinueButton(discord.ui.Button):
             current_date=v.current_date,
             parent_view=v,
             original_message_id=v.message_id,  # Use the stored message_id
-            original_channel_id=getattr(interaction.channel, 'id', None)
-            if interaction.channel
-            else None,
+            original_channel_id=(
+                getattr(interaction.channel, 'id', None)
+                if interaction.channel
+                else None
+            ),
         )
         await interaction.response.send_modal(modal)

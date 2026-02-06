@@ -19,7 +19,9 @@ class _Rule:
         return self._earned, {'x': 1}
 
 
-def test_engine_dispatch_creates_achievement_and_awards_once(monkeypatch, clean_registry):
+def test_engine_dispatch_creates_achievement_and_awards_once(
+    monkeypatch, clean_registry
+):
     rule = _Rule('r1', earned=True)
     clean_registry.register(rule)  # type: ignore[arg-type]
 
@@ -55,7 +57,9 @@ def test_engine_dispatch_creates_achievement_and_awards_once(monkeypatch, clean_
     monkeypatch.setattr(engine_module.User, 'get_profile', lambda *a, **k: {'level': 1})
 
     earned = engine_module.engine.dispatch(
-        ActivityRecordedEvent(user_id=1, activity_id=1, category='Steps', date_occurred=date(2026, 2, 5))
+        ActivityRecordedEvent(
+            user_id=1, activity_id=1, category='Steps', date_occurred=date(2026, 2, 5)
+        )
     )
 
     assert len(earned) == 1
@@ -72,12 +76,16 @@ def test_engine_dispatch_skips_if_not_earned(monkeypatch, clean_registry):
     monkeypatch.setattr(engine_module.UserAchievement, 'exists', lambda *a, **k: False)
 
     created = []
-    monkeypatch.setattr(engine_module.UserAchievement, 'create', lambda v: created.append(v))
+    monkeypatch.setattr(
+        engine_module.UserAchievement, 'create', lambda v: created.append(v)
+    )
 
     monkeypatch.setattr(engine_module.User, 'get_profile', lambda *a, **k: {'level': 1})
 
     earned = engine_module.engine.dispatch(
-        ActivityRecordedEvent(user_id=1, activity_id=1, category='Steps', date_occurred=date(2026, 2, 5))
+        ActivityRecordedEvent(
+            user_id=1, activity_id=1, category='Steps', date_occurred=date(2026, 2, 5)
+        )
     )
 
     assert earned == []

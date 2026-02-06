@@ -40,7 +40,8 @@ def test_activity_group_key_steps_daily():
 
 def test_activity_group_key_steps_weekly():
     assert (
-        ActivityRecord._activity_group_key('Steps', 'Weekly Steps 70k+') == 'steps_weekly'
+        ActivityRecord._activity_group_key('Steps', 'Weekly Steps 70k+')
+        == 'steps_weekly'
     )
 
 

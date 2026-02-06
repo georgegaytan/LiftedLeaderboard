@@ -14,15 +14,17 @@ def test_streak_rule_handles_only_activity_recorded():
 
 def test_daily_streak_achieved(monkeypatch, fake_db):
     end = date(2026, 2, 7)
-    fake_db.fetchall_results = [[
-        {'date_occurred': date(2026, 2, 1)},
-        {'date_occurred': date(2026, 2, 2)},
-        {'date_occurred': date(2026, 2, 3)},
-        {'date_occurred': date(2026, 2, 4)},
-        {'date_occurred': date(2026, 2, 5)},
-        {'date_occurred': date(2026, 2, 6)},
-        {'date_occurred': date(2026, 2, 7)},
-    ]]
+    fake_db.fetchall_results = [
+        [
+            {'date_occurred': date(2026, 2, 1)},
+            {'date_occurred': date(2026, 2, 2)},
+            {'date_occurred': date(2026, 2, 3)},
+            {'date_occurred': date(2026, 2, 4)},
+            {'date_occurred': date(2026, 2, 5)},
+            {'date_occurred': date(2026, 2, 6)},
+            {'date_occurred': date(2026, 2, 7)},
+        ]
+    ]
 
     with pytest.MonkeyPatch.context() as mp:
         from tests.conftest import FakeDBManager
@@ -39,14 +41,16 @@ def test_daily_streak_achieved(monkeypatch, fake_db):
 
 def test_daily_streak_not_achieved_gap(monkeypatch, fake_db):
     end = date(2026, 2, 7)
-    fake_db.fetchall_results = [[
-        {'date_occurred': date(2026, 2, 1)},
-        {'date_occurred': date(2026, 2, 2)},
-        {'date_occurred': date(2026, 2, 4)},
-        {'date_occurred': date(2026, 2, 5)},
-        {'date_occurred': date(2026, 2, 6)},
-        {'date_occurred': date(2026, 2, 7)},
-    ]]
+    fake_db.fetchall_results = [
+        [
+            {'date_occurred': date(2026, 2, 1)},
+            {'date_occurred': date(2026, 2, 2)},
+            {'date_occurred': date(2026, 2, 4)},
+            {'date_occurred': date(2026, 2, 5)},
+            {'date_occurred': date(2026, 2, 6)},
+            {'date_occurred': date(2026, 2, 7)},
+        ]
+    ]
 
     from tests.conftest import FakeDBManager
 
