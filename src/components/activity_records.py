@@ -276,11 +276,10 @@ class RecordEditModal(discord.ui.Modal):
             'recovery_weekly_sleep',
             'diet_weekly_no_alcohol',
         }:
-            weekly_dup = ActivityRecord.has_group_activity_within_days(
+            weekly_dup = ActivityRecord.has_group_activity_in_week(
                 user_id=record['user_id'],
                 group_key=group_key,
                 date_iso=date_val,
-                days=7,
                 exclude_record_id=self.record_id,
             )
             if weekly_dup:

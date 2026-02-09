@@ -234,11 +234,10 @@ class ActivityRecordsCog(commands.Cog):
             'diet_weekly_no_alcohol',
         }:
             weekly_dup = await asyncio.to_thread(
-                ActivityRecord.has_group_activity_within_days,
+                ActivityRecord.has_group_activity_in_week,
                 user_id,
                 group_key,
                 date_iso,
-                7,
             )
             if weekly_dup:
                 await interaction.response.send_message(

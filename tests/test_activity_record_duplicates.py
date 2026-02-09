@@ -88,9 +88,9 @@ def test_has_group_activity_on_date_unknown_key_raises():
         ActivityRecord.has_group_activity_on_date(1, 'unknown', '2026-02-05')
 
 
-def test_has_group_activity_within_days_unknown_key_raises():
+def test_has_group_activity_in_week_unknown_key_raises():
     with pytest.raises(ValueError):
-        ActivityRecord.has_group_activity_within_days(1, 'unknown', '2026-02-05', 7)
+        ActivityRecord.has_group_activity_in_week(1, 'unknown', '2026-02-05')
 
 
 def test_has_group_activity_on_date_steps_daily(monkeypatch):
@@ -107,17 +107,15 @@ def test_has_group_activity_on_date_steps_daily(monkeypatch):
     assert "a.name LIKE 'Daily Steps%%'" in q
 
 
-def test_has_group_activity_within_days_steps_weekly(monkeypatch):
+def test_has_group_activity_in_week_steps_weekly(monkeypatch):
     fake_mgr = _FakeDBManager(row={'ok': 1})
     monkeypatch.setattr(activity_record_module, 'DBManager', fake_mgr)
 
     assert (
-        ActivityRecord.has_group_activity_within_days(
-            1, 'steps_weekly', '2026-02-05', 7
-        )
+        ActivityRecord.has_group_activity_in_week(1, 'steps_weekly', '2026-02-05')
         is True
     )
     assert fake_mgr.instance is not None
     q = fake_mgr.instance.last_query or ''
     assert "a.name LIKE 'Weekly Steps%%'" in q
-    assert "+ (%s * INTERVAL '1 day')" in q
+    assert "date_trunc('week'" in q

@@ -80,12 +80,11 @@ class ActivityRecord(BaseModel):
         return row is not None
 
     @classmethod
-    def has_group_activity_within_days(
+    def has_group_activity_in_week(
         cls,
         user_id: int | str,
         group_key: str,
         date_iso: str,
-        days: int,
         *,
         exclude_record_id: int | None = None,
     ) -> bool:
@@ -103,15 +102,15 @@ class ActivityRecord(BaseModel):
         else:
             raise ValueError(f'Unknown weekly group_key: {group_key}')
 
-        # Rolling window around date_iso, inclusive.
+        # Check within the same week as date_iso (Monday to Sunday)
         sql = (
             'SELECT 1 FROM activity_records ar '
             'JOIN activities a ON a.id = ar.activity_id '
             f'WHERE ar.user_id = %s AND {where} '
-            'AND ar.date_occurred >= (%s::date - (%s * INTERVAL \'1 day\')) '
-            'AND ar.date_occurred <= (%s::date + (%s * INTERVAL \'1 day\'))'
+            "AND ar.date_occurred >= date_trunc('week', %s::date) "
+            "AND ar.date_occurred < date_trunc('week', %s::date) + INTERVAL '1 week'"
         )
-        params: list[Any] = [user_id, date_iso, days, date_iso, days]
+        params: list[Any] = [user_id, date_iso, date_iso]
         if exclude_record_id is not None:
             sql += ' AND ar.id <> %s'
             params.append(exclude_record_id)
