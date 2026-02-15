@@ -201,6 +201,8 @@ class ActivityRecordsCog(commands.Cog):
         # Duplicate validation
         activity_name = str(activity_row.get('name', activity))
         group_key = ActivityRecord._activity_group_key(category, activity_name)
+
+        # Handle daily group activities (like Daily Steps)
         if group_key == 'steps_daily':
             dup = await asyncio.to_thread(
                 ActivityRecord.has_group_activity_on_date,
@@ -214,7 +216,29 @@ class ActivityRecordsCog(commands.Cog):
                     ephemeral=True,
                 )
                 return
-        else:
+
+        # Handle weekly group activities
+        elif group_key in {
+            'steps_weekly',
+            'recovery_weekly_sleep',
+            'diet_weekly_no_alcohol',
+        }:
+            # Check for weekly duplicates first
+            weekly_dup = await asyncio.to_thread(
+                ActivityRecord.has_group_activity_in_week,
+                user_id,
+                group_key,
+                date_iso,
+            )
+            if weekly_dup:
+                await interaction.response.send_message(
+                    '❌ You already recorded a weekly version of that activity '
+                    'in last 7 days.',
+                    ephemeral=True,
+                )
+                return
+
+            # Also check for same-day duplicates for weekly activities
             dup = await asyncio.to_thread(
                 ActivityRecord.has_activity_on_date,
                 user_id,
@@ -228,21 +252,17 @@ class ActivityRecordsCog(commands.Cog):
                 )
                 return
 
-        if group_key in {
-            'steps_weekly',
-            'recovery_weekly_sleep',
-            'diet_weekly_no_alcohol',
-        }:
-            weekly_dup = await asyncio.to_thread(
-                ActivityRecord.has_group_activity_in_week,
+        # Handle regular activities (no group key)
+        else:
+            dup = await asyncio.to_thread(
+                ActivityRecord.has_activity_on_date,
                 user_id,
-                group_key,
+                activity_id,
                 date_iso,
             )
-            if weekly_dup:
+            if dup:
                 await interaction.response.send_message(
-                    '❌ You already recorded a weekly version of that activity '
-                    'in last 7 days.',
+                    '❌ You already recorded that activity for that day.',
                     ephemeral=True,
                 )
                 return

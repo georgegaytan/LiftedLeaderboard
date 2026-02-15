@@ -244,6 +244,8 @@ class RecordEditModal(discord.ui.Modal):
         group_key = ActivityRecord._activity_group_key(
             self.staged_category, self.staged_activity_name
         )
+
+        # Handle daily group activities (like Daily Steps)
         if group_key == 'steps_daily':
             dup = ActivityRecord.has_group_activity_on_date(
                 user_id=record['user_id'],
@@ -257,7 +259,29 @@ class RecordEditModal(discord.ui.Modal):
                     ephemeral=True,
                 )
                 return
-        else:
+
+        # Handle weekly group activities
+        elif group_key in {
+            'steps_weekly',
+            'recovery_weekly_sleep',
+            'diet_weekly_no_alcohol',
+        }:
+            # Check for weekly duplicates first
+            weekly_dup = ActivityRecord.has_group_activity_in_week(
+                user_id=record['user_id'],
+                group_key=group_key,
+                date_iso=date_val,
+                exclude_record_id=self.record_id,
+            )
+            if weekly_dup:
+                await interaction.response.send_message(
+                    '❌ You already recorded a weekly version of that '
+                    'activity in the last 7 days.',
+                    ephemeral=True,
+                )
+                return
+
+            # Also check for same-day duplicates for weekly activities
             dup = ActivityRecord.has_activity_on_date(
                 user_id=record['user_id'],
                 activity_id=self.staged_activity_id,
@@ -271,21 +295,17 @@ class RecordEditModal(discord.ui.Modal):
                 )
                 return
 
-        if group_key in {
-            'steps_weekly',
-            'recovery_weekly_sleep',
-            'diet_weekly_no_alcohol',
-        }:
-            weekly_dup = ActivityRecord.has_group_activity_in_week(
+        # Handle regular activities (no group key)
+        else:
+            dup = ActivityRecord.has_activity_on_date(
                 user_id=record['user_id'],
-                group_key=group_key,
+                activity_id=self.staged_activity_id,
                 date_iso=date_val,
                 exclude_record_id=self.record_id,
             )
-            if weekly_dup:
+            if dup:
                 await interaction.response.send_message(
-                    '❌ You already recorded a weekly version of that '
-                    'activity in the last 7 days.',
+                    '❌ You already recorded that activity for that day.',
                     ephemeral=True,
                 )
                 return
