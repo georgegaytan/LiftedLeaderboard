@@ -274,6 +274,12 @@ class ActivityRecordsCog(commands.Cog):
             '⏳ Recording your activity...', wait=True
         )
 
+        # Daily bonus - check BEFORE inserting to see if this is first activity
+        has_today = await asyncio.to_thread(
+            ActivityRecord.has_record_on_date, user_id, today_iso
+        )
+        should_give_daily_bonus = not has_today
+
         await asyncio.to_thread(
             ActivityRecord.insert,
             user_id=user_id,
@@ -292,11 +298,8 @@ class ActivityRecordsCog(commands.Cog):
         if date_iso != today_iso:
             message_lines.append(f'📅 Date: {date_iso}')
 
-        # Daily bonus
-        has_today = await asyncio.to_thread(
-            ActivityRecord.has_record_on_date, user_id, today_iso
-        )
-        if not has_today:
+        # Add daily bonus if this was the first activity of the day
+        if should_give_daily_bonus:
             await asyncio.to_thread(User.add_daily_bonus, user_id)
             message_lines.append('🎁 Daily bonus: +10 XP')
 
