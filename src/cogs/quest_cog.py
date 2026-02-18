@@ -191,27 +191,29 @@ class QuestCog(commands.Cog):
                 is_new_bonus=opt['is_new'],
             )
 
-            bonus_text = ' + 100 New Activity Bonus!' if opt['is_new'] else '!'
-            await interaction.followup.send(
-                f'✅ **Quest Accepted!**\n'
-                f'Activity: **{opt["name"]}**\n'
-                f'Deadline: {discord.utils.format_dt(deadline, "R")}\n'
-                f'Potential Reward: {opt["xp_value"]} XP + 50 Quest XP'
-                f'{bonus_text}',
-                ephemeral=True,
-            )
-
+            bonus_text = ' +100 New Activity Bonus!' if opt['is_new'] else '!'
             # Announce in channel (publicly)
             try:
                 if interaction.channel:
                     await interaction.channel.send(
                         f'⚔️ **{interaction.user.display_name}** '
                         'accepted a new quest!\n'
-                        f'Target: **{opt["name"]}**\n'
-                        f'Deadline: {discord.utils.format_dt(deadline, "R")}'
+                        f'Activity: **{opt["name"]}**\n'
+                        f'Deadline: {discord.utils.format_dt(deadline, "R")}\n'
+                        f'Potential Reward: {opt["xp_value"]} XP + 50 Quest XP'
+                        f'{bonus_text}',
                     )
             except discord.Forbidden:
-                pass  # Bot might not have permissions to send in channel
+                await interaction.followup.send(
+                    'ERROR: Missing permissions '
+                    'to announce quest in channel.\n'
+                    f'✅ **Quest Accepted!**\n'
+                    f'Activity: **{opt["name"]}**\n'
+                    f'Deadline: {discord.utils.format_dt(deadline, "R")}\n'
+                    f'Potential Reward: {opt["xp_value"]} XP + 50 Quest XP'
+                    f'{bonus_text}',
+                    ephemeral=True,
+                )
 
 
 async def setup(bot: commands.Bot):
