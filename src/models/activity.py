@@ -76,3 +76,17 @@ class Activity(BaseModel):
         with DBManager() as db:
             rows = db.fetchall(sql, (limit,))
         return cast(list[dict[str, Any]], rows)
+
+    @classmethod
+    def get_by_ids(cls, activity_ids: list[int]) -> list[dict[str, Any]]:
+        if not activity_ids:
+            return []
+
+        placeholders = ', '.join(['%s'] * len(activity_ids))
+        sql = (
+            f'SELECT id, name, category, xp_value FROM activities '
+            f'WHERE id IN ({placeholders})'
+        )
+        with DBManager() as db:
+            rows = db.fetchall(sql, tuple(activity_ids))
+        return cast(list[dict[str, Any]], rows)

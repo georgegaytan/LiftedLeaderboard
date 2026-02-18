@@ -309,7 +309,6 @@ class ActivityRecordsCog(commands.Cog):
         if active_quest and active_quest['activity_id'] == activity_id:
             now = datetime.now(timezone.utc)
             if active_quest['deadline'] > now:
-                # Quest completed!
                 bonus_xp = 50 + (100 if active_quest['is_new_bonus'] else 0)
                 await asyncio.to_thread(User.add_daily_bonus, user_id, bonus_xp)
                 await asyncio.to_thread(Quest.delete_quest, active_quest['id'])
@@ -319,14 +318,8 @@ class ActivityRecordsCog(commands.Cog):
                     quest_msg += ' (New Activity Bonus!)'
                 message_lines.append(quest_msg)
 
-                # We might want to trigger some event or sound?
-                # For now, just the message and XP is good.
             else:
-                # Expired quest
                 await asyncio.to_thread(Quest.delete_quest, active_quest['id'])
-                # message_lines.append(
-                #     '⚠️ Your active quest for this activity has expired.'
-                # )
 
         unlocked: list[dict] = []
         try:

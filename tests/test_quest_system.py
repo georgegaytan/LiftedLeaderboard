@@ -16,10 +16,12 @@ def mock_db_manager(monkeypatch):
 
     # Patch DBManager in all necessary modules
     from src.models import base as base_module
+    from src.models import quest_roll as quest_roll_module
 
     monkeypatch.setattr(quest_module, 'DBManager', lambda: mock_manager)
     monkeypatch.setattr(activity_module, 'DBManager', lambda: mock_manager)
     monkeypatch.setattr(base_module, 'DBManager', lambda: mock_manager)
+    monkeypatch.setattr(quest_roll_module, 'DBManager', lambda: mock_manager)
 
     return mock_db
 
@@ -91,3 +93,87 @@ def test_activity_get_random(mock_db_manager):
     assert result == mock_rows
     assert mock_db_manager.fetchall.called
     assert 'ORDER BY RANDOM()' in mock_db_manager.fetchall.call_args[0][0]
+
+
+def test_quest_roll_get_or_create(mock_db_manager):
+    user_id = 999
+
+    # 1. Test creation (no existing roll)
+    # mock_db_manager is the connection.
+    # quest_roll.get calls base.get which does SELECT ...
+    # We first want get() to return None, then create() to interpret INSERT
+
+    # We need to control what different calls return.
+    # Base.get calls fetchone
+    # Base.create calls fetchall (with RETURNING *)
+
+    # First call: get(user_id) -> returns None
+    # Second call: create(...) -> returns the created dict
+
+    mock_db_manager.fetchone.side_effect = [
+        None,
+        None,
+    ]  # One for get in get_or_create, one for get in create check?
+    # No create doesn't call get unless ...
+    # Wait, create calls fetchall with INSERT ... RETURNING *
+
+    created_roll = {
+        'user_id': user_id,
+        'activity_ids': [1, 2, 3, 4, 5],
+        'date_rolled': datetime.now(timezone.utc),
+        'has_accepted': False,
+    }
+
+    # fetchall is called by create -> upsert -> fetchall
+    mock_db_manager.fetchall.return_value = [created_roll]
+
+    from src.models.quest_roll import QuestRoll
+
+    # Mock ID generator
+    gen_ids = MagicMock(return_value=[1, 2, 3, 4, 5])
+
+    result = QuestRoll.get_or_create(user_id, gen_ids)
+
+    assert result == created_roll
+    assert gen_ids.called
+    assert mock_db_manager.fetchone.called  # Checks for existence
+
+    # 2. Test retrieval (existing valid roll)
+    existing_roll = {
+        'user_id': user_id,
+        'activity_ids': [10, 11],
+        'date_rolled': datetime.now(timezone.utc),  # Fresh
+        'has_accepted': True,
+    }
+
+    mock_db_manager.fetchone.side_effect = None  # Reset
+    mock_db_manager.fetchone.return_value = existing_roll
+    gen_ids.reset_mock()
+
+    result = QuestRoll.get_or_create(user_id, gen_ids)
+
+    assert result == existing_roll
+    assert not gen_ids.called
+
+    # 3. Test expiration (existing old roll)
+    old_date = datetime.now(timezone.utc) - timedelta(days=8)
+    expired_roll = {
+        'user_id': user_id,
+        'activity_ids': [99],
+        'date_rolled': old_date,
+        'has_accepted': True,
+    }
+
+    mock_db_manager.fetchone.return_value = expired_roll
+
+    # It should call upsert to update.
+    # upsert calls fetchall.
+    new_roll = created_roll.copy()
+    new_roll['activity_ids'] = [5, 4, 3, 2, 1]
+    mock_db_manager.fetchall.return_value = [new_roll]
+    gen_ids.return_value = [5, 4, 3, 2, 1]
+
+    result = QuestRoll.get_or_create(user_id, gen_ids)
+
+    assert result == new_roll
+    assert gen_ids.called
