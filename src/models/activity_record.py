@@ -150,6 +150,16 @@ class ActivityRecord(BaseModel):
         return row is not None
 
     @classmethod
+    def has_any_record(cls, user_id: int | str, activity_id: int) -> bool:
+        with DBManager() as db:
+            row = db.fetchone(
+                'SELECT 1 FROM activity_records WHERE user_id = %s '
+                'AND activity_id = %s LIMIT 1',
+                (user_id, activity_id),
+            )
+        return row is not None
+
+    @classmethod
     def recent_for_user(
         cls,
         user_id: int | str,
