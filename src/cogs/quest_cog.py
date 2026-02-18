@@ -73,6 +73,7 @@ class QuestCog(commands.Cog):
         description='Roll 5 random activities and choose one as a quest for bonus XP',
     )
     async def quest(self, interaction: Interaction):
+        await interaction.response.defer(ephemeral=True)
         user_id = interaction.user.id
 
         # Check for existing active quest
@@ -81,7 +82,7 @@ class QuestCog(commands.Cog):
             now = datetime.now(timezone.utc)
             deadline = active_quest['deadline']
             if deadline > now:
-                await interaction.response.send_message(
+                await interaction.followup.send(
                     f'⚠️ You already have an active quest: '
                     f'**{active_quest["activity_name"]}**\n'
                     f"Deadline: {discord.utils.format_dt(deadline, 'R')}",
@@ -95,7 +96,7 @@ class QuestCog(commands.Cog):
         # Fetch 5 random activities
         activities = await asyncio.to_thread(Activity.get_random, 5)
         if not activities:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 '❌ No activities available for quests.', ephemeral=True
             )
             return
