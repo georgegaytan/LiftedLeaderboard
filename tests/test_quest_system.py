@@ -16,12 +16,10 @@ def mock_db_manager(monkeypatch):
 
     # Patch DBManager in all necessary modules
     from src.models import base as base_module
-    from src.models import quest_roll as quest_roll_module
 
     monkeypatch.setattr(quest_module, 'DBManager', lambda: mock_manager)
     monkeypatch.setattr(activity_module, 'DBManager', lambda: mock_manager)
     monkeypatch.setattr(base_module, 'DBManager', lambda: mock_manager)
-    monkeypatch.setattr(quest_roll_module, 'DBManager', lambda: mock_manager)
 
     return mock_db
 
