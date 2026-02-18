@@ -65,14 +65,3 @@ class Activity(BaseModel):
                 'xp_value': xp_value,
             },
         )
-
-    @classmethod
-    def get_random(cls, limit: int = 5) -> list[dict[str, Any]]:
-        sql = (
-            'SELECT id, name, category, xp_value FROM activities '
-            'WHERE is_archived = FALSE '
-            'ORDER BY RANDOM() LIMIT %s'
-        )
-        with DBManager() as db:
-            rows = db.fetchall(sql, (limit,))
-        return cast(list[dict[str, Any]], rows)
