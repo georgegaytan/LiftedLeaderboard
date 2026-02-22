@@ -16,7 +16,7 @@ When you identify a function that is too complex (e.g., handles validation, data
 1. **Analyze**: Understand the function's flow, inputs, outputs, and side effects.
 2. **Decompose**: Propose a chain of **Pure Functions** that handle specific responsibilities.
     * Examples: `validate_lift_specs()`, `calculate_ranking_delta()`, `persist_to_leaderboard()`.
-3. **Refactor**: Create a "Foundational Engineer" solution.
+3. **Refactor**: Create a 'Foundational Engineer' solution.
     * The original function becomes a high-level orchestrator calling the new pure functions.
     * The new functions should be small, focused, and testable.
 

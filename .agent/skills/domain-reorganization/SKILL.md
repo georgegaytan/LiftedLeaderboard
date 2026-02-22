@@ -7,7 +7,7 @@ description: Organize codebases using Domain-Driven Design (DDD) principles to f
 
 ## The Problem
 
-Codebases often degrade into "graveyards" of `utils` generic folders, or files where database models are mixed with API routes and business logic. This makes the system hard to navigate and refactor.
+Codebases often degrade into 'graveyards' of `utils` generic folders, or files where database models are mixed with API routes and business logic. This makes the system hard to navigate and refactor.
 
 ## The Process
 
@@ -17,7 +17,7 @@ Codebases often degrade into "graveyards" of `utils` generic folders, or files w
     * Import patterns: See which modules are tightly coupled.
 
 2. **Cluster**: Identify related logic.
-    * Group functions and classes by **Domain Concept** (e.g., "Lifting Formulas", "User Management", "Leaderboard Calculation") rather than technical type (e.g., "Controllers", "Models").
+    * Group functions and classes by **Domain Concept** (e.g., 'Lifting Formulas', 'User Management', 'Leaderboard Calculation') rather than technical type (e.g., 'Controllers', 'Models').
 
 3. **Propose**: Suggest a **Domain-Driven Design (DDD)** structure.
     * **Domain Layer**: `/domain/<concept>/`
