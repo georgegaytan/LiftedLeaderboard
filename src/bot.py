@@ -10,11 +10,7 @@ from src.database.db_manager import DBManager
 from src.utils.env import load_env
 from src.utils.tracing import trace_span
 
-# Logging setup
-logging.basicConfig(
-    level=logging.INFO,  # Min level to show: DEBUG<INFO<WARNING<ERROR<CRITICAL
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-)
+# Logger
 logger = logging.getLogger(__name__)
 
 
