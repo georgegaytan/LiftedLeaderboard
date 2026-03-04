@@ -104,8 +104,11 @@ class UserCog(commands.Cog):
             hashed_password = make_password(password)
         except Exception:
             # Fallback if somehow django isn't fully loaded
+            import os
+
             import django
 
+            os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.core.settings')
             django.setup()
             from django.contrib.auth.hashers import make_password
 
