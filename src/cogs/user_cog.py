@@ -97,12 +97,20 @@ class UserCog(commands.Cog):
         display_name = interaction.user.display_name
 
         import os
+        import sys
 
         import django
         from django.conf import settings
 
+        # Add the 'web' directory to Python's path so Django can find 'dashboard'
+        web_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'web'
+        )
+        if web_dir not in sys.path:
+            sys.path.append(web_dir)
+
         if not settings.configured:
-            os.environ['DJANGO_SETTINGS_MODULE'] = 'web.core.settings'
+            os.environ['DJANGO_SETTINGS_MODULE'] = 'core.settings'
             django.setup()
 
         from django.contrib.auth.hashers import make_password
