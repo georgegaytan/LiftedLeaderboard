@@ -1,7 +1,6 @@
 from django.contrib.auth.models import (
     AbstractBaseUser,
     BaseUserManager,
-    PermissionsMixin,
 )
 from django.db import models
 from django.utils import timezone
@@ -38,7 +37,7 @@ class CustomUserManager(BaseUserManager):
         return self.create_user(email, password, **extra_fields)
 
 
-class User(AbstractBaseUser, PermissionsMixin):
+class User(AbstractBaseUser):
     id = models.BigIntegerField(primary_key=True)
     display_name = models.TextField()
     total_xp = models.IntegerField(default=0)
