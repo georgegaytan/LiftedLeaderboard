@@ -96,23 +96,18 @@ class UserCog(commands.Cog):
         user_id = str(interaction.user.id)
         display_name = interaction.user.display_name
 
-        # We will use Django's check_password and make_password for hashing
-        # For simplicity without loading full Django context inside the bot:
-        try:
-            from django.contrib.auth.hashers import make_password
+        import os
 
-            hashed_password = make_password(password)
-        except Exception:
-            # Fallback if somehow django isn't fully loaded
-            import os
+        import django
+        from django.conf import settings
 
-            import django
-
-            os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'web.core.settings')
+        if not settings.configured:
+            os.environ['DJANGO_SETTINGS_MODULE'] = 'web.core.settings'
             django.setup()
-            from django.contrib.auth.hashers import make_password
 
-            hashed_password = make_password(password)
+        from django.contrib.auth.hashers import make_password
+
+        hashed_password = make_password(password)
 
         with DBManager() as db:
             # Ensure user exists first
