@@ -14,5 +14,7 @@ flake8-docstrings>=1.7.0
 flake8-quotes>=3.3.2
 isort>=5.13.0
 mypy>=1.8.0
+Django>=5.0
+dj-database-url>=2.1.0
 pre-commit>=3.6.0
 types-requests>=2.32.0

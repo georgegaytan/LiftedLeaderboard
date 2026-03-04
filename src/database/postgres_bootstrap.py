@@ -14,6 +14,11 @@ def init_schema_pg(db: DBManager) -> None:
             display_name TEXT NOT NULL,
             total_xp INTEGER NOT NULL DEFAULT 0,
             level INTEGER NOT NULL DEFAULT 1,
+            email TEXT UNIQUE NULL,
+            password TEXT NULL,
+            is_admin BOOLEAN NOT NULL DEFAULT FALSE,
+            is_active BOOLEAN NOT NULL DEFAULT TRUE,
+            last_login TIMESTAMPTZ NULL,
             created_at TIMESTAMPTZ DEFAULT NOW(),
             updated_at TIMESTAMPTZ DEFAULT NOW()
         )
