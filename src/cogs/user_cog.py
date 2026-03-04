@@ -82,6 +82,70 @@ class UserCog(commands.Cog):
 
             await interaction.response.send_message(embed=embed, ephemeral=True)
 
+    @app_commands.command(
+        name='dashboard_register',
+        description='Register an email and password to access the web dashboard',
+    )
+    @app_commands.describe(
+        email='The email you want to use for the dashboard',
+        password='The password for your dashboard account',
+    )
+    async def dashboard_register(
+        self, interaction: Interaction, email: str, password: str
+    ):
+        user_id = str(interaction.user.id)
+        display_name = interaction.user.display_name
+
+        import os
+        import sys
+
+        import django
+        from django.conf import settings
+
+        # Add the 'web' directory to Python's path so Django can find 'dashboard'
+        web_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'web'
+        )
+        if web_dir not in sys.path:
+            sys.path.append(web_dir)
+
+        if not settings.configured:
+            os.environ['DJANGO_SETTINGS_MODULE'] = 'core.settings'
+            django.setup()
+
+        from django.contrib.auth.hashers import make_password
+
+        hashed_password = make_password(password)
+
+        with DBManager() as db:
+            # Ensure user exists first
+            existing = db.fetchone(
+                'SELECT id, email FROM users WHERE id = %s', (user_id,)
+            )
+            if not existing:
+                db.execute(
+                    '''
+                    INSERT INTO users (id, display_name, email, password)
+                    VALUES (%s, %s, %s, %s)
+                    ''',
+                    (user_id, display_name, email, hashed_password),
+                )
+            else:
+                db.execute(
+                    '''
+                    UPDATE users
+                    SET email = %s, password = %s
+                    WHERE id = %s
+                    ''',
+                    (email, hashed_password, user_id),
+                )
+
+        await interaction.response.send_message(
+            f'✅ {interaction.user.mention}, your dashboard account has been set up! '
+            'You can login with your email at the dashboard.',
+            ephemeral=True,
+        )
+
 
 async def setup(bot):
     await bot.add_cog(UserCog(bot))
