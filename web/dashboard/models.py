@@ -62,11 +62,21 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     @property
     def is_staff(self):
-        return self.is_admin
+        # Anyone with an active account (has email) can log in
+        return self.is_active
 
     @property
     def is_superuser(self):
         return self.is_admin
+
+    def has_perm(self, perm, obj=None):
+        if self.is_admin:
+            return True
+        # Read-only access for basic users
+        return perm.split('_')[0] == 'view'
+
+    def has_module_perms(self, app_label):
+        return self.is_active
 
     def __str__(self):
         return self.display_name or str(self.email)
